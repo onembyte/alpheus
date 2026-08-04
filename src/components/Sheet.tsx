@@ -48,7 +48,7 @@ export default function Sheet({ card, dryRun, freeKb, busy, onConfirm, onCancel 
 
   return (
     <div
-      className="absolute inset-0 z-50"
+      className="absolute inset-0 z-50 flex items-center justify-center p-6"
       style={{ background: "rgba(0,0,0,.34)", backdropFilter: "blur(3px)" }}
       onClick={busy ? undefined : onCancel}
       role="dialog"
@@ -57,8 +57,9 @@ export default function Sheet({ card, dryRun, freeKb, busy, onConfirm, onCancel 
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="sheet-in absolute left-1/2 top-0 flex max-h-[88%] w-[472px] flex-col rounded-b-[20px] p-6 pb-5"
+        className="modal-pop flex max-h-full flex-col rounded-[20px] p-6 pb-5"
         style={{
+          width: "min(560px, 100%)",
           background: "linear-gradient(170deg, var(--glass-a), var(--glass-b)), var(--win)",
           backdropFilter: "blur(50px) saturate(200%)",
           WebkitBackdropFilter: "blur(50px) saturate(200%)",
@@ -104,16 +105,17 @@ export default function Sheet({ card, dryRun, freeKb, busy, onConfirm, onCancel 
           {METHOD_TEXT[dryRun.method]}
         </div>
 
+        <div className="mt-4 flex min-h-0 flex-col gap-2.5 overflow-y-auto">
         {dryRun.command && (
           <code
-            className="mono selectable mt-2.5 block rounded-[10px] px-3 py-2 text-[11.5px]"
+            className="mono selectable block flex-none rounded-[10px] px-3 py-2 text-[11.5px]"
             style={{ background: "var(--inset-panel)", color: "var(--txt)", boxShadow: "0 0 0 1px var(--edge-lo)" }}
           >
             $ {dryRun.command}
           </code>
         )}
 
-        <div className="inset-panel mono mt-4 flex flex-none flex-col gap-[7px] p-3.5 text-[11px]">
+        <div className="inset-panel mono flex flex-none flex-col gap-[7px] p-3.5 text-[11px]">
           <div className="flex justify-between">
             <span style={{ color: "var(--txt3)" }}>locations</span>
             <span style={{ color: "var(--txt)" }}>{dryRun.entries.length || card.paths.length}</span>
@@ -139,7 +141,7 @@ export default function Sheet({ card, dryRun, freeKb, busy, onConfirm, onCancel 
         </div>
 
         {dryRun.entries.length > 0 && (
-          <div className="inset-panel selectable mt-2.5 min-h-0 overflow-y-auto p-3" style={{ maxHeight: 170 }}>
+          <div className="inset-panel selectable flex-none p-3">
             {dryRun.entries.map((e) => (
               <div key={e.path} className="flex items-center gap-3 py-[3px]">
                 <span
@@ -161,12 +163,13 @@ export default function Sheet({ card, dryRun, freeKb, busy, onConfirm, onCancel 
 
         {card.proof && (
           <pre
-            className="inset-panel mono selectable mt-2.5 max-h-[110px] overflow-y-auto whitespace-pre-wrap p-3 text-[10.5px] leading-relaxed"
+            className="inset-panel mono selectable flex-none whitespace-pre-wrap p-3 text-[10.5px] leading-relaxed"
             style={{ color: "var(--txt3)" }}
           >
             {card.proof}
           </pre>
         )}
+        </div>
 
         <div className="mt-4 flex flex-none items-center gap-2.5">
           {needsAck && (

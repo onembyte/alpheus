@@ -48,13 +48,14 @@ export default function Sidebar(p: Props) {
       <div data-tauri-drag-region className="flex items-center gap-2.5 px-[18px] pb-3">
         <LogoMark size={17} />
         <span
+          data-tauri-drag-region
           className="text-[11px] font-semibold uppercase"
           style={{ letterSpacing: ".11em", color: "var(--txt)" }}
         >
           Storage Manager
         </span>
-        <div className="grow" />
-        <span className="mono text-[9.5px]" style={{ color: "var(--txt3)" }}>
+        <div data-tauri-drag-region className="grow" />
+        <span data-tauri-drag-region className="mono text-[9.5px]" style={{ color: "var(--txt3)" }}>
           {__APP_VERSION__}
         </span>
       </div>

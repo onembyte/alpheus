@@ -8,23 +8,27 @@ mod disk;
 mod exec;
 mod history;
 mod scan;
+mod settings;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, State, WindowEvent,
+    AppHandle, Emitter, Manager, State, WindowEvent,
 };
 
 use disk::DiskUsage;
 use exec::{DryRun, ExecResult};
 use history::HistoryEntry;
 use scan::Card;
+use settings::AppSettings;
 
 /// Executor only ever acts on cards produced by the last scan — the frontend
 /// sends an id, never paths.
 #[derive(Default)]
 pub struct ScanState(pub Mutex<HashMap<String, Card>>);
+
+pub struct SettingsState(pub Mutex<AppSettings>);
 
 #[tauri::command]
 fn disk_usage() -> DiskUsage {
@@ -84,6 +88,24 @@ fn history(app: AppHandle) -> Vec<HistoryEntry> {
         .unwrap_or_default()
 }
 
+#[tauri::command]
+fn get_settings(state: State<SettingsState>) -> AppSettings {
+    *state.0.lock().unwrap()
+}
+
+#[tauri::command]
+fn set_settings(
+    new_settings: AppSettings,
+    app: AppHandle,
+    state: State<SettingsState>,
+) -> Result<(), String> {
+    *state.0.lock().unwrap() = new_settings;
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    settings::save(&dir, &new_settings);
+    update_tray(&app); // threshold may have changed the ⚠️ state
+    Ok(())
+}
+
 fn now_secs() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -91,17 +113,23 @@ fn now_secs() -> u64 {
         .unwrap_or(0)
 }
 
-fn tray_title(u: &DiskUsage) -> String {
+fn tray_title(u: &DiskUsage, warn_below_gb: f64) -> String {
     let gb = u.free_kb as f64 / (1024.0 * 1024.0);
-    if gb < 15.0 {
+    if gb < warn_below_gb {
         format!("⚠️ {gb:.1} GB")
     } else {
         format!("{gb:.0} GB")
     }
 }
 
+fn warn_threshold(app: &AppHandle) -> f64 {
+    app.try_state::<SettingsState>()
+        .map(|s| s.0.lock().unwrap().notify_below_gb)
+        .unwrap_or(15.0)
+}
+
 fn update_tray(app: &AppHandle) {
-    let title = tray_title(&disk::usage());
+    let title = tray_title(&disk::usage(), warn_threshold(app));
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         if let Some(tray) = handle.tray_by_id("main-tray") {
@@ -110,19 +138,44 @@ fn update_tray(app: &AppHandle) {
     });
 }
 
+/// User-space notification without a plugin dependency.
+fn notify(body: &str) {
+    let script = format!(
+        "display notification \"{}\" with title \"Storage Manager\"",
+        body.replace('"', "'")
+    );
+    let _ = std::process::Command::new("/usr/bin/osascript")
+        .arg("-e")
+        .arg(script)
+        .output();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(ScanState::default())
         .invoke_handler(tauri::generate_handler![
-            disk_usage, scan, dry_run, execute, history
+            disk_usage,
+            scan,
+            dry_run,
+            execute,
+            history,
+            get_settings,
+            set_settings
         ])
         .setup(|app| {
+            let initial = app
+                .path()
+                .app_data_dir()
+                .map(|d| settings::load(&d))
+                .unwrap_or_default();
+            app.manage(SettingsState(Mutex::new(initial)));
+
             let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?;
             TrayIconBuilder::with_id("main-tray")
                 .icon(icon)
                 .icon_as_template(true)
-                .title(tray_title(&disk::usage()))
+                .title(tray_title(&disk::usage(), initial.notify_below_gb))
                 .tooltip("Storage Manager")
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
@@ -140,10 +193,44 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // One background thread: tray refresh, low-space notification with
+            // hysteresis, and the optional automatic rescan.
             let handle = app.handle().clone();
-            std::thread::spawn(move || loop {
-                std::thread::sleep(std::time::Duration::from_secs(60));
-                update_tray(&handle);
+            std::thread::spawn(move || {
+                let mut last_scan = std::time::Instant::now();
+                let mut warned_low = false;
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(60));
+                    update_tray(&handle);
+
+                    let (interval_secs, threshold_gb) = {
+                        let s = handle.state::<SettingsState>();
+                        let s = s.0.lock().unwrap();
+                        (s.auto_scan_secs, s.notify_below_gb)
+                    };
+
+                    let free_gb = disk::usage().free_kb as f64 / (1024.0 * 1024.0);
+                    if free_gb < threshold_gb {
+                        if !warned_low {
+                            warned_low = true;
+                            notify(&format!(
+                                "Free space is down to {free_gb:.1} GB — open Storage Manager to reclaim."
+                            ));
+                        }
+                    } else {
+                        warned_low = false;
+                    }
+
+                    if interval_secs > 0 && last_scan.elapsed().as_secs() >= interval_secs {
+                        last_scan = std::time::Instant::now();
+                        let cards = scan::scan_all();
+                        let state = handle.state::<ScanState>();
+                        *state.0.lock().unwrap() =
+                            cards.iter().map(|c| (c.id.clone(), c.clone())).collect();
+                        let _ = handle.emit("auto-scan", &cards);
+                        update_tray(&handle);
+                    }
+                }
             });
             Ok(())
         })

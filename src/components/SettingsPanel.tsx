@@ -1,10 +1,18 @@
 import type { ThemeMode } from "../hooks/useTheme";
+import { useSettings } from "../hooks/useSettings";
 import LogoMark from "./LogoMark";
 
 interface Props {
   mode: ThemeMode;
   onMode: (m: ThemeMode) => void;
 }
+
+const SCAN_INTERVALS: { label: string; secs: number }[] = [
+  { label: "Off", secs: 0 },
+  { label: "Hourly", secs: 3600 },
+  { label: "Every 6 h", secs: 21600 },
+  { label: "Daily", secs: 86400 },
+];
 
 const OPTIONS: { key: ThemeMode; label: string; sub: string; icon: React.ReactNode }[] = [
   {
@@ -52,6 +60,7 @@ const OPTIONS: { key: ThemeMode; label: string; sub: string; icon: React.ReactNo
 ];
 
 export default function SettingsPanel({ mode, onMode }: Props) {
+  const { settings, update } = useSettings();
   return (
     <div className="fade-up mx-auto flex w-full max-w-[620px] flex-col gap-4">
       <div className="glass-card px-[18px] pb-[18px] pt-4">
@@ -98,6 +107,67 @@ export default function SettingsPanel({ mode, onMode }: Props) {
               </button>
             );
           })}
+        </div>
+      </div>
+
+      <div className="glass-card px-[18px] pb-[18px] pt-4">
+        <div className="section-label mb-1">Automatic scanning</div>
+        <div className="mb-3.5 text-[11.5px]" style={{ color: "var(--txt3)" }}>
+          Rescans in the background and keeps the menu-bar number fresh. You'll get a
+          notification when free space drops below the threshold.
+        </div>
+        <div className="flex gap-2" role="radiogroup" aria-label="Automatic scan interval">
+          {SCAN_INTERVALS.map((o) => {
+            const active = settings?.auto_scan_secs === o.secs;
+            return (
+              <button
+                key={o.secs}
+                role="radio"
+                aria-checked={active}
+                disabled={!settings}
+                onClick={() => update({ auto_scan_secs: o.secs })}
+                className="btn-focus flex-1 rounded-[11px] px-3 py-2 text-[12px] font-semibold transition-all hover:bg-(--track) disabled:opacity-50"
+                style={
+                  active
+                    ? {
+                        color: "var(--txt)",
+                        background: "var(--sel)",
+                        boxShadow: "inset 0 1px 0 var(--edge-hi), 0 0 0 1px var(--sel-edge)",
+                      }
+                    : {
+                        color: "var(--txt2)",
+                        background: "var(--panel)",
+                        boxShadow: "0 0 0 1px var(--panel-edge)",
+                      }
+                }
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-3.5 flex items-center gap-2.5">
+          <span className="text-[12px]" style={{ color: "var(--txt2)" }}>
+            Warn when free space drops below
+          </span>
+          <input
+            type="number"
+            min={5}
+            max={200}
+            step={1}
+            disabled={!settings}
+            value={settings ? Math.round(settings.notify_below_gb) : 15}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (Number.isFinite(v) && v >= 1) update({ notify_below_gb: v });
+            }}
+            className="mono inset-panel btn-focus w-16 rounded-[9px] px-2 py-1.5 text-right text-[12px]"
+            style={{ color: "var(--txt)", border: "none" }}
+            aria-label="Low free space threshold in gigabytes"
+          />
+          <span className="mono text-[11px]" style={{ color: "var(--txt3)" }}>
+            GB
+          </span>
         </div>
       </div>
 

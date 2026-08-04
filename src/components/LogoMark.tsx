@@ -2,6 +2,7 @@
 export default function LogoMark({ size }: { size: number }) {
   return (
     <svg
+      data-tauri-drag-region
       width={size}
       height={size}
       viewBox="0 0 100 100"

@@ -216,18 +216,18 @@ body {
   animation: ringIn 1.05s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes sheetIn {
+@keyframes modalPop {
   from {
     opacity: 0;
-    transform: translate(-50%, -34px) scale(0.97);
+    transform: translateY(-16px) scale(0.97);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: none;
   }
 }
-.sheet-in {
-  animation: sheetIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+.modal-pop {
+  animation: modalPop 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes sheen {
@@ -321,7 +321,7 @@ body {
   .ring-in,
   .bar-in,
   .fade-up,
-  .sheet-in {
+  .modal-pop {
     animation: none;
   }
 }

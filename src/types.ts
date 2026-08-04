@@ -44,3 +44,8 @@ export interface HistoryEntry {
   freed_kb: number;
   method: string;
 }
+
+export interface AppSettings {
+  auto_scan_secs: number;
+  notify_below_gb: number;
+}

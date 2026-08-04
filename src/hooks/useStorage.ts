@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import * as api from "../api";
 import type { Card, DiskUsage, DryRun, HistoryEntry, Tier } from "../types";
 
@@ -49,6 +50,17 @@ export function useStorage() {
     rescan();
     refreshHistory();
   }, [refreshUsage, rescan, refreshHistory]);
+
+  // Background auto-scans (Settings → Automatic scanning) push fresh cards.
+  useEffect(() => {
+    const un = listen<Card[]>("auto-scan", (e) => {
+      setCards(e.payload);
+      refreshUsage();
+    });
+    return () => {
+      un.then((f) => f());
+    };
+  }, [refreshUsage]);
 
   const showToast = useCallback((msg: string) => {
     window.clearTimeout(toastTimer.current);

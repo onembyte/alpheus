@@ -21,6 +21,14 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/onembyte/storage-manager/releases/latest/download/Storage-Manager-macOS.dmg">
+    <img src="https://img.shields.io/badge/⬇%20Download%20for%20macOS-Apple%20Silicon-4c8bf5?style=for-the-badge" alt="Download for macOS" />
+  </a>
+  <br />
+  <sub>Unsigned build — right-click → Open on first launch.</sub>
+</p>
+
+<p align="center">
   <img src="docs/design/overview.png" width="704" alt="Overview — allocation ring, capacity bar, mounted volumes" />
 </p>
 <p align="center">

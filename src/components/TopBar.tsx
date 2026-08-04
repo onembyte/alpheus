@@ -24,10 +24,10 @@ export default function TopBar(p: Props) {
       style={{ borderBottom: "1px solid var(--hair)" }}
     >
       <div data-tauri-drag-region className="min-w-[178px]">
-        <div className="text-[14px] font-semibold" style={{ color: "var(--txt)" }}>
+        <div data-tauri-drag-region className="text-[14px] font-semibold" style={{ color: "var(--txt)" }}>
           {p.view === "reclaim" ? "Reclaim" : p.view === "history" ? "History" : "Settings"}
         </div>
-        <div className="mono text-[10.5px]" style={{ color: "var(--txt3)" }}>
+        <div data-tauri-drag-region className="mono text-[10.5px]" style={{ color: "var(--txt3)" }}>
           {p.view === "reclaim"
             ? `${fmtKB(p.reclaimableKb)} reclaimable · du actuals`
             : p.view === "history"
