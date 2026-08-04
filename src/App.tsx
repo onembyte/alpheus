@@ -158,6 +158,18 @@ export default function App() {
                   />
                 )}
 
+                {filter !== "all" &&
+                  (s.cards ?? []).filter((c) => c.tier === filter).length === 0 && (
+                    <div className="glass-card fade-up px-[18px] py-12 text-center">
+                      <div className="text-[13px]" style={{ color: "var(--txt2)" }}>
+                        Nothing in this tier right now.
+                      </div>
+                      <div className="mono mt-1 text-[10.5px]" style={{ color: "var(--txt3)" }}>
+                        rescan or pick another category on the left
+                      </div>
+                    </div>
+                  )}
+
                 {visibleTiers.map((tier) => {
                   const meta = TIER_META[tier];
                   const group = (s.cards ?? []).filter((c) => c.tier === tier);

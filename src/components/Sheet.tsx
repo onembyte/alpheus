@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Card, DryRun } from "../types";
 import { fmtKB, shortenPath } from "../format";
 
@@ -50,6 +50,10 @@ export default function Sheet({ card, dryRun, freeKb, busy, onConfirm, onCancel 
   const v = VARIANT[dryRun.method];
   const needsAck = card.tier === "with-care";
   const [acked, setAcked] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  // Keyboard users land on the harmless button first.
+  useEffect(() => cancelRef.current?.focus(), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -224,6 +228,7 @@ export default function Sheet({ card, dryRun, freeKb, busy, onConfirm, onCancel 
           )}
           <div className="grow" />
           <button
+            ref={cancelRef}
             onClick={onCancel}
             disabled={busy}
             className="glass-chip btn-focus flex h-[31px] items-center rounded-[9px] px-[17px] text-[12px] font-medium disabled:opacity-50"

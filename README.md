@@ -37,6 +37,16 @@ This app was born from one such archaeology session on a chronically full
 245 GB MacBook (~90 GB of "System Data" decoded by hand). It turns that
 one-off audit into a permanent, one-glance, one-click desktop tool.
 
+## Design
+
+The UI is a liquid-glass system ("Strata", designed in Claude Design): a
+token-driven set of glass surfaces over an animated wallpaper, with full
+dark **and** light appearances (toggle in the sidebar), an allocation ring
+and glossy capacity bar fed by real scan data, breakdown-style rows with
+proportional bars, a top-drop confirmation sheet, and SF-mono typography
+for every number and path. Decorative motion respects
+`prefers-reduced-motion`.
+
 ## What it does
 
 - **Scans the real space hogs** in parallel (`du -sk` actuals, not estimates):

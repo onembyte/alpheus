@@ -34,6 +34,16 @@ export default function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
         </div>
       </div>
 
+      <div
+        className="hairline-b mono flex items-center gap-3.5 pb-2 pt-1 text-[10px] font-semibold uppercase"
+        style={{ color: "var(--txt3)", letterSpacing: ".06em" }}
+      >
+        <span className="w-[118px] flex-none">When</span>
+        <span className="min-w-0 flex-1">Action</span>
+        <span className="w-[110px] flex-none text-right">Method</span>
+        <span className="w-[76px] flex-none text-right">Freed</span>
+      </div>
+
       {[...entries].reverse().map((e, i) => (
         <div
           key={`${e.timestamp}-${i}`}

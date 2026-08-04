@@ -54,7 +54,7 @@ export default function CardRow({ card, color, maxKb, onAction }: Props) {
         >
           {card.size_kb > 0 ? fmtKB(card.size_kb) : "—"}
         </div>
-        <div className="hidden w-[120px] flex-none justify-end xl:flex">
+        <div className="hidden w-[120px] flex-none justify-end lg:flex">
           <TierBadge tier={card.tier} />
         </div>
         <div className="flex w-[86px] flex-none justify-end">
