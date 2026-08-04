@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Card, DryRun } from "../types";
 import { fmtKB } from "../format";
 import TierBadge from "./TierBadge";
@@ -29,9 +29,26 @@ export default function ConfirmModal({ card, dryRun, busy, onConfirm, onCancel }
   const [acked, setAcked] = useState(false);
   const btn = CONFIRM_BTN[dryRun.method];
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [busy, onCancel]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-      <div className="flex max-h-[85vh] w-[580px] flex-col rounded-2xl border border-neutral-700 bg-neutral-900 shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
+      onClick={busy ? undefined : onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-label={card.title}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="modal-enter flex max-h-[85vh] w-[580px] flex-col rounded-2xl border border-neutral-700 bg-neutral-900 shadow-2xl"
+      >
         <div className="flex items-center gap-2 border-b border-neutral-800 px-5 py-4">
           <h2 className="text-sm font-semibold">{card.title}</h2>
           <TierBadge tier={card.tier} />
@@ -96,14 +113,14 @@ export default function ConfirmModal({ card, dryRun, busy, onConfirm, onCancel }
           <button
             onClick={onCancel}
             disabled={busy}
-            className="rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2 text-xs font-medium text-neutral-300 hover:bg-neutral-700 disabled:opacity-50"
+            className="btn-focus rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2 text-xs font-medium text-neutral-300 hover:bg-neutral-700 disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={busy || (needsAck && !acked)}
-            className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-40 ${btn.cls}`}
+            className={`btn-focus rounded-lg px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-40 ${btn.cls}`}
           >
             {busy ? "Working…" : btn.label}
           </button>

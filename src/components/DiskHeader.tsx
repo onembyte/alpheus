@@ -30,17 +30,20 @@ export default function DiskHeader(p: Props) {
   return (
     <header
       data-tauri-drag-region
-      className="border-b border-neutral-800/80 bg-neutral-900/60 px-5 pb-4 pt-3"
+      className="relative border-b border-neutral-800/80 bg-neutral-900/60 px-5 pb-4 pt-3"
     >
       {/* row 1 — title (inset for traffic lights) + actions */}
       <div data-tauri-drag-region className="flex items-center gap-3 pl-16">
         <h1 data-tauri-drag-region className="text-sm font-semibold tracking-wide text-neutral-300">
           Storage Manager
         </h1>
+        <span data-tauri-drag-region className="text-[11px] tabular-nums text-neutral-600">
+          v0.1.0
+        </span>
         <div className="grow" data-tauri-drag-region />
         <button
           onClick={() => p.onTab(p.tab === "history" ? "cards" : "history")}
-          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+          className={`btn-focus rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
             p.tab === "history"
               ? "border-neutral-500 bg-neutral-700/60 text-neutral-100"
               : "border-neutral-700 bg-neutral-800/60 text-neutral-300 hover:bg-neutral-800"
@@ -51,7 +54,7 @@ export default function DiskHeader(p: Props) {
         <button
           onClick={p.onRescan}
           disabled={p.scanning}
-          className="rounded-lg border border-sky-700/60 bg-sky-600/15 px-3 py-1.5 text-xs font-medium text-sky-300 transition-colors hover:bg-sky-600/25 disabled:opacity-50"
+          className="btn-focus rounded-lg border border-sky-700/60 bg-sky-600/15 px-3 py-1.5 text-xs font-medium text-sky-300 transition-colors hover:bg-sky-600/25 disabled:opacity-50"
         >
           {p.scanning ? "Scanning…" : "Rescan"}
         </button>
@@ -124,6 +127,12 @@ export default function DiskHeader(p: Props) {
           </span>
         </div>
       </div>
+
+      {p.scanning && (
+        <div className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden">
+          <div className="scan-indicator h-full w-1/3 rounded-full bg-sky-500/80" />
+        </div>
+      )}
     </header>
   );
 }

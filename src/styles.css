@@ -30,3 +30,52 @@ body {
   user-select: text;
   cursor: text;
 }
+
+/* Keyboard-only focus ring; invisible for mouse users */
+.btn-focus {
+  outline: none;
+}
+.btn-focus:focus-visible {
+  box-shadow: 0 0 0 2px rgb(56 189 248 / 0.7);
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.card-enter {
+  animation: card-enter 180ms ease-out both;
+}
+
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.modal-enter {
+  animation: modal-enter 140ms ease-out both;
+}
+
+/* Indeterminate scan progress along the header's bottom edge */
+@keyframes scan-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+.scan-indicator {
+  animation: scan-slide 1.1s ease-in-out infinite;
+}

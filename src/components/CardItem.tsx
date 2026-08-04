@@ -24,7 +24,7 @@ export default function CardItem({ card, onAction }: Props) {
   const btn = card.action === "explain" ? null : BUTTON[card.tier];
 
   return (
-    <div className="flex items-start gap-4 rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+    <div className="card-enter flex items-start gap-4 rounded-xl border border-neutral-800 bg-neutral-900 p-4 transition-colors hover:border-neutral-700">
       <div className="min-w-0 grow">
         <div className="flex items-center gap-2">
           <h3 className="truncate text-sm font-semibold">{card.title}</h3>
@@ -76,7 +76,7 @@ export default function CardItem({ card, onAction }: Props) {
         {btn ? (
           <button
             onClick={() => onAction(card)}
-            className={`mt-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${btn.cls}`}
+            className={`btn-focus mt-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${btn.cls}`}
           >
             {btn.label}
           </button>
