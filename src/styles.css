@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ─── Strata design tokens (from the Claude Design project) ─────────────── */
+/* ─── Design tokens (from the Claude Design project) ────────────────────── */
 
 :root {
   --blur: 44px;
@@ -121,7 +121,7 @@ body {
   background: transparent;
 }
 
-/* ─── Strata surfaces ───────────────────────────────────────────────────── */
+/* ─── Glass surfaces ────────────────────────────────────────────────────── */
 
 .glass-card {
   border-radius: 19px;
@@ -173,7 +173,7 @@ body {
   box-shadow: 0 0 0 2px var(--sel-edge);
 }
 
-/* ─── Motion (Strata keyframes) ─────────────────────────────────────────── */
+/* ─── Motion ────────────────────────────────────────────────────────────── */
 
 @keyframes fadeUp {
   from {

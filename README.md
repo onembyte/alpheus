@@ -28,7 +28,7 @@
   <img src="docs/design/duplicates-inspector.png" width="284" alt="Duplicates and volume inspector" />
   <img src="docs/design/inspector-actions.png" width="130" alt="Snapshots and quick actions" />
 </p>
-<p align="center"><sub><em>Strata</em>, the liquid-glass design system this app implements — designed in Claude Design.</sub></p>
+<p align="center"><sub>The Storage Manager design system — liquid glass, designed in Claude Design.</sub></p>
 
 ## Why
 
@@ -45,7 +45,7 @@ one-off audit into a permanent, one-glance, one-click desktop tool.
 
 ## Design
 
-The UI is a liquid-glass system ("Strata", designed in Claude Design): a
+The UI is a liquid-glass design system (designed in Claude Design): a
 token-driven set of glass surfaces over an animated wallpaper, with full
 dark **and** light appearances (toggle in the sidebar), an allocation ring
 and glossy capacity bar fed by real scan data, breakdown-style rows with

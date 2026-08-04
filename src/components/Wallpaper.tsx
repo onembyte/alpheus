@@ -1,5 +1,5 @@
 /**
- * The Strata backdrop: four drifting radial blobs plus two diagonal streak
+ * The app backdrop: four drifting radial blobs plus two diagonal streak
  * layers, all blurred behind the glass window surface. Pure decoration —
  * pointer-events pass straight through.
  */

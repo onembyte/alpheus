@@ -28,7 +28,7 @@ export const TIER_META: Record<
 export const TIER_ORDER: Tier[] = ["safe", "with-care", "manual"];
 
 /**
- * Strata categorical ramp. Colors are assigned to cards by descending size at
+ * Categorical ramp. Colors are assigned to cards by descending size at
  * scan time and stay with the card for the whole session (color follows the
  * entity, never its rank in a filtered view).
  */

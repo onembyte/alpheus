@@ -28,7 +28,7 @@ const METHOD_TEXT: Record<DryRun["method"], string> = {
   command: "Runs this exact command — nothing else:",
 };
 
-/** Strata top-drop confirmation sheet. */
+/** Top-drop confirmation sheet. */
 export default function Sheet({ card, dryRun, freeKb, busy, onConfirm, onCancel }: Props) {
   const v = VARIANT[dryRun.method];
   const needsAck = card.tier === "with-care";
