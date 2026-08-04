@@ -22,7 +22,7 @@
 
 <p align="center">
   <a href="https://github.com/onembyte/alpheus/releases/latest/download/Alpheus-macOS.dmg">
-    <img src="https://img.shields.io/badge/⬇%20Download%20for%20macOS-Apple%20Silicon-4c8bf5?style=for-the-badge" alt="Download for macOS" />
+    <img src="docs/download-button.svg" width="400" alt="Download Alpheus — macOS · Apple Silicon · .dmg" />
   </a>
   <br />
   <sub>Unsigned build — right-click → Open on first launch.</sub>

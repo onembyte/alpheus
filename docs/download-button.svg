@@ -1,0 +1,38 @@
+<svg width="640" height="96" viewBox="0 0 640 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Download Alpheus for macOS">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#93ACFF"/>
+      <stop offset="0.55" stop-color="#6F8CF4"/>
+      <stop offset="1" stop-color="#5670E0"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- button body -->
+  <rect x="3" y="3" width="634" height="90" rx="24" fill="url(#bg)"/>
+  <rect x="3" y="3" width="634" height="90" rx="24" stroke="#FFFFFF" stroke-opacity="0.38" stroke-width="1.6"/>
+  <!-- top gloss -->
+  <rect x="6" y="6" width="628" height="42" rx="21" fill="url(#gloss)"/>
+  <!-- bottom edge shade -->
+  <rect x="4" y="88" width="632" height="4" rx="2" fill="#1E2B66" fill-opacity="0.25"/>
+
+  <!-- ring mark -->
+  <g transform="rotate(-90 70 48)">
+    <circle cx="70" cy="48" r="22" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-dasharray="111.4 138.2"/>
+    <circle cx="70" cy="48" r="12.5" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round" stroke-dasharray="52.3 78.5" opacity="0.65"/>
+  </g>
+  <circle cx="70" cy="48" r="3.6" fill="#FFFFFF"/>
+
+  <!-- label -->
+  <text x="118" y="44" font-family="-apple-system,'SF Pro Display','Segoe UI',system-ui,sans-serif" font-size="26" font-weight="700" fill="#FFFFFF">Download Alpheus</text>
+  <text x="118" y="70" font-family="ui-monospace,'SF Mono',Menlo,monospace" font-size="14" font-weight="500" fill="#FFFFFF" fill-opacity="0.82">macOS · Apple Silicon · .dmg</text>
+
+  <!-- download glyph -->
+  <circle cx="582" cy="48" r="23" fill="#FFFFFF" fill-opacity="0.17"/>
+  <circle cx="582" cy="48" r="23" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="1.4"/>
+  <path d="M582 35v17.5M573.5 44.5l8.5 8.5 8.5-8.5" stroke="#FFFFFF" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M572 60.5h20" stroke="#FFFFFF" stroke-width="3.4" stroke-linecap="round"/>
+</svg>
