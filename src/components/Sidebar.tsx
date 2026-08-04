@@ -57,7 +57,7 @@ export default function Sidebar(p: Props) {
           className="text-[11px] font-semibold uppercase"
           style={{ letterSpacing: ".11em", color: "var(--txt)" }}
         >
-          Storage Manager
+          Alpheus
         </span>
         <div data-tauri-drag-region className="grow" />
         <span data-tauri-drag-region className="mono text-[9.5px]" style={{ color: "var(--txt3)" }}>

@@ -142,7 +142,7 @@ fn update_tray(app: &AppHandle) {
 /// User-space notification without a plugin dependency.
 fn notify(body: &str) {
     let script = format!(
-        "display notification \"{}\" with title \"Storage Manager\"",
+        "display notification \"{}\" with title \"Alpheus\"",
         body.replace('"', "'")
     );
     let _ = std::process::Command::new("/usr/bin/osascript")
@@ -178,7 +178,7 @@ pub fn run() {
                 .icon(icon)
                 .icon_as_template(true)
                 .title(tray_title(&disk::usage(), initial_threshold))
-                .tooltip("Storage Manager")
+                .tooltip("Alpheus")
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
@@ -221,7 +221,7 @@ pub fn run() {
                         if !warned_low {
                             warned_low = true;
                             notify(&format!(
-                                "Free space is down to {free_gb:.1} GB — open Storage Manager to reclaim."
+                                "Free space is down to {free_gb:.1} GB — open Alpheus to reclaim."
                             ));
                         }
                     } else {
@@ -299,5 +299,5 @@ pub fn run() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("error while running Storage Manager");
+        .expect("error while running Alpheus");
 }

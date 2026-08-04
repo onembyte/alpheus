@@ -230,7 +230,7 @@ export default function SettingsPanel({ mode, onMode, settings, update }: Props)
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             <span className="text-[13px] font-semibold" style={{ color: "var(--txt)" }}>
-              Storage Manager
+              Alpheus
             </span>
             <span className="mono text-[10.5px]" style={{ color: "var(--txt3)" }}>
               {__APP_VERSION__}
@@ -240,7 +240,7 @@ export default function SettingsPanel({ mode, onMode, settings, update }: Props)
             The macOS storage pane — but honest, drillable, and able to actually fix things.
           </div>
           <div className="mono selectable mt-1 text-[10.5px]" style={{ color: "var(--txt3)" }}>
-            github.com/onembyte/storage-manager · MIT
+            github.com/onembyte/alpheus · MIT
           </div>
         </div>
       </div>

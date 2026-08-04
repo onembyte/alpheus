@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="src-tauri/icons/128x128%402x.png" width="96" alt="Storage Manager icon" />
+  <img src="src-tauri/icons/128x128%402x.png" width="96" alt="Alpheus icon" />
 </p>
 
-<h1 align="center">Storage Manager</h1>
+<h1 align="center">Alpheus</h1>
 
 <p align="center">
   The macOS storage pane — but honest, drillable, and able to actually fix things.
@@ -15,13 +15,13 @@
 </p>
 
 <p align="center">
-  <img src="https://github.com/onembyte/storage-manager/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  <img src="https://github.com/onembyte/alpheus/actions/workflows/ci.yml/badge.svg" alt="CI" />
   <img src="https://img.shields.io/badge/platform-macOS-black" alt="macOS" />
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/onembyte/storage-manager/releases/latest/download/Storage-Manager-macOS.dmg">
+  <a href="https://github.com/onembyte/alpheus/releases/latest/download/Alpheus-macOS.dmg">
     <img src="https://img.shields.io/badge/⬇%20Download%20for%20macOS-Apple%20Silicon-4c8bf5?style=for-the-badge" alt="Download for macOS" />
   </a>
   <br />
@@ -36,7 +36,7 @@
   <img src="docs/design/duplicates-inspector.png" width="284" alt="Duplicates and volume inspector" />
   <img src="docs/design/inspector-actions.png" width="130" alt="Snapshots and quick actions" />
 </p>
-<p align="center"><sub>The Storage Manager design system — liquid glass, designed in Claude Design.</sub></p>
+<p align="center"><sub>The Alpheus design system — liquid glass, designed in Claude Design.</sub></p>
 
 ## Why
 
@@ -55,7 +55,7 @@ one-off audit into a permanent, one-glance, one-click desktop tool.
 
 The UI is a liquid-glass design system (designed in Claude Design): a
 token-driven set of glass surfaces over an animated wallpaper, with full
-dark **and** light appearances (toggle in the sidebar), an allocation ring
+dark **and** light appearances (System/Light/Dark in Settings), an allocation ring
 and glossy capacity bar fed by real scan data, breakdown-style rows with
 proportional bars, a top-drop confirmation sheet, and SF-mono typography
 for every number and path. Decorative motion respects
@@ -76,8 +76,13 @@ for every number and path. Decorative motion respects
   unpushed commits* — the card shows the `git status` evidence. Everything
   else lands in a "needs a decision" tier with a mandatory review dialog.
 - **Lives in the menu bar**: the free-space number is always visible, turns
-  into a ⚠️ warning under 15 GB, and clicking it opens the main window.
-- **Logs every action** to a history view — "freed 23.4 GB on Aug 3".
+  into a ⚠️ warning below a configurable threshold, and clicking it opens the
+  main window.
+- **Scans and cleans on a schedule**: optional background scans (hourly to
+  daily) with low-space notifications, plus opt-in automatic cleanup of
+  safe-tier categories you mark — enforced in Rust to the safe tier only.
+- **Logs every action** to a history view — "freed 23.4 GB on Aug 3", with
+  automatic runs tagged `auto`.
 
 ## Safety model
 
@@ -160,12 +165,11 @@ scripts/make-icons.mjs  procedural app/tray icons (no image deps)
 
 ## Roadmap
 
-- **v0.2 — offload to NAS**: pick a cold folder → upload via WebDAV or rsync
-  → checksum-verify the remote copy → only then reclaim locally, leaving a
+- **Offload to NAS**: pick a cold folder → upload via WebDAV or rsync →
+  checksum-verify the remote copy → only then reclaim locally, leaving a
   `.offloaded` breadcrumb.
-- Scheduled background scans (launchd) with a notification when free space
-  drops below a threshold.
 - Incremental scan cache (SQLite) so rescans only re-measure changed roots.
+- Signed + notarized builds.
 
 ## License
 
