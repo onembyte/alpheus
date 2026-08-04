@@ -1,18 +1,31 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
-export type Theme = "dark" | "light";
+export type ThemeMode = "system" | "light" | "dark";
 
-/** Strata ships full token sets for both appearances; persist the choice. */
+/**
+ * Appearance preference, configured from Settings. "system" tracks the macOS
+ * appearance live via prefers-color-scheme; explicit modes pin it. Persisted
+ * across launches.
+ */
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem("sm-theme") as Theme) ?? "dark",
-  );
+  const [mode, setMode] = useState<ThemeMode>(() => {
+    const v = localStorage.getItem("sm-theme");
+    return v === "light" || v === "dark" || v === "system" ? v : "system";
+  });
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem("sm-theme", theme);
-  }, [theme]);
+    localStorage.setItem("sm-theme", mode);
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      document.documentElement.dataset.theme =
+        mode === "system" ? (mq.matches ? "dark" : "light") : mode;
+    };
+    apply();
+    if (mode === "system") {
+      mq.addEventListener("change", apply);
+      return () => mq.removeEventListener("change", apply);
+    }
+  }, [mode]);
 
-  const toggle = useCallback(() => setTheme((t) => (t === "dark" ? "light" : "dark")), []);
-  return { theme, toggle };
+  return { mode, setMode };
 }

@@ -1,7 +1,7 @@
 import type { DiskUsage, Tier } from "../types";
-import type { Theme } from "../hooks/useTheme";
 import { TIER_META, TIER_ORDER } from "../tiers";
 import { fmtKB } from "../format";
+import LogoMark from "./LogoMark";
 
 export type TierFilter = "all" | Tier;
 
@@ -10,43 +10,8 @@ interface Props {
   tierTotals: Record<Tier, number>;
   filter: TierFilter;
   onFilter: (f: TierFilter) => void;
-  theme: Theme;
-  onToggleTheme: () => void;
-}
-
-/** The Strata ring mark — open arcs, notch always facing the same corner. */
-function LogoMark({ size }: { size: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 100 100"
-      fill="none"
-      style={{ color: "var(--accent)", flex: "none" }}
-    >
-      <circle
-        cx="50"
-        cy="50"
-        r="38"
-        stroke="currentColor"
-        strokeWidth="14"
-        strokeLinecap="round"
-        strokeDasharray="192.3 238.8"
-        transform="rotate(-90 50 50)"
-      />
-      <circle
-        cx="50"
-        cy="50"
-        r="20"
-        stroke="currentColor"
-        strokeWidth="12"
-        strokeLinecap="round"
-        strokeDasharray="83.8 125.7"
-        transform="rotate(-90 50 50)"
-        opacity=".6"
-      />
-    </svg>
-  );
+  settingsActive: boolean;
+  onOpenSettings: () => void;
 }
 
 function freeStatus(usage: DiskUsage | null): { color: string; label: string; pulse: boolean } {
@@ -166,11 +131,28 @@ export default function Sidebar(p: Props) {
 
       <div className="flex flex-none gap-2 p-3" style={{ borderTop: "1px solid var(--hair)" }}>
         <button
-          onClick={p.onToggleTheme}
+          onClick={p.onOpenSettings}
           className="glass-chip btn-focus flex h-[30px] flex-1 items-center justify-center gap-1.5 text-[11.5px] font-medium"
-          style={{ color: "var(--txt2)" }}
+          style={
+            p.settingsActive
+              ? {
+                  color: "var(--txt)",
+                  background: "var(--sel)",
+                  boxShadow: "inset 0 1px 0 var(--edge-hi), 0 0 0 1px var(--sel-edge)",
+                }
+              : { color: "var(--txt2)" }
+          }
         >
-          {p.theme === "dark" ? "Light appearance" : "Dark appearance"}
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="2.2" stroke="currentColor" strokeWidth="1.3" />
+            <path
+              d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
+          </svg>
+          Settings
         </button>
       </div>
     </div>

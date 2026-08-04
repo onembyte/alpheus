@@ -1,6 +1,6 @@
 import { fmtKB } from "../format";
 
-export type View = "reclaim" | "history";
+export type View = "reclaim" | "history" | "settings";
 
 interface Props {
   view: View;
@@ -25,12 +25,14 @@ export default function TopBar(p: Props) {
     >
       <div data-tauri-drag-region className="min-w-[178px]">
         <div className="text-[14px] font-semibold" style={{ color: "var(--txt)" }}>
-          {p.view === "reclaim" ? "Reclaim" : "History"}
+          {p.view === "reclaim" ? "Reclaim" : p.view === "history" ? "History" : "Settings"}
         </div>
         <div className="mono text-[10.5px]" style={{ color: "var(--txt3)" }}>
           {p.view === "reclaim"
             ? `${fmtKB(p.reclaimableKb)} reclaimable · du actuals`
-            : `${p.historyCount} action${p.historyCount === 1 ? "" : "s"} logged`}
+            : p.view === "history"
+              ? `${p.historyCount} action${p.historyCount === 1 ? "" : "s"} logged`
+              : "appearance · about"}
         </div>
       </div>
 

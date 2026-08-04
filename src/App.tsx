@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStorage } from "./hooks/useStorage";
 import { useTheme } from "./hooks/useTheme";
 import { cardColor, TIER_META, TIER_ORDER } from "./tiers";
@@ -10,6 +10,7 @@ import OverviewPanel from "./components/OverviewPanel";
 import CardRow from "./components/CardRow";
 import Sheet from "./components/Sheet";
 import HistoryPanel from "./components/HistoryPanel";
+import SettingsPanel from "./components/SettingsPanel";
 import { fmtKB } from "./format";
 
 function ScanningState() {
@@ -52,9 +53,21 @@ function ScanningState() {
 
 export default function App() {
   const s = useStorage();
-  const { theme, toggle: toggleTheme } = useTheme();
+  const { mode, setMode } = useTheme();
   const [view, setView] = useState<View>("reclaim");
   const [filter, setFilter] = useState<TierFilter>("all");
+
+  // Cmd+, opens Settings, like any other macOS app.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey && e.key === ",") {
+        e.preventDefault();
+        setView("settings");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   /** Stable card→color assignment by size order within the current scan. */
   const colorOf = useMemo(() => {
@@ -98,8 +111,8 @@ export default function App() {
             setFilter(f);
             setView("reclaim");
           }}
-          theme={theme}
-          onToggleTheme={toggleTheme}
+          settingsActive={view === "settings"}
+          onOpenSettings={() => setView("settings")}
         />
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -133,7 +146,9 @@ export default function App() {
               </div>
             )}
 
-            {view === "history" ? (
+            {view === "settings" ? (
+              <SettingsPanel mode={mode} onMode={setMode} />
+            ) : view === "history" ? (
               <HistoryPanel entries={s.history} />
             ) : s.scanning && !s.cards ? (
               <ScanningState />
