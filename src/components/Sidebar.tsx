@@ -14,6 +14,10 @@ interface Props {
   warnBelowGb: number;
   volumeActive: boolean;
   onSelectVolume: () => void;
+  driveConnected: boolean | null;
+  driveLabel: string;
+  driveActive: boolean;
+  onSelectDrive: () => void;
   settingsActive: boolean;
   onOpenSettings: () => void;
 }
@@ -108,6 +112,43 @@ export default function Sidebar(p: Props) {
             style={{ background: status.color, boxShadow: `0 0 8px ${status.color}` }}
             title={status.label}
           />
+        </button>
+
+        <div className="section-label px-2.5 pb-2 pt-4">Cloud</div>
+
+        <button
+          onClick={p.onSelectDrive}
+          className="btn-focus flex items-center gap-2.5 rounded-[11px] px-2.5 py-2 text-left transition-colors hover:bg-(--track)"
+          style={selected(p.driveActive)}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 18 18"
+            fill="none"
+            style={{ flex: "none", color: "var(--txt)" }}
+          >
+            <path
+              d="M5 12.6h7.6a2.6 2.6 0 0 0 .3-5.2A3.9 3.9 0 0 0 5.4 6.6 2.9 2.9 0 0 0 5 12.6Z"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              opacity=".85"
+            />
+          </svg>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-medium" style={{ color: "var(--txt)" }}>
+              Google Drive
+            </div>
+            <div className="mono truncate text-[10.5px]" style={{ color: "var(--txt3)" }}>
+              {p.driveLabel}
+            </div>
+          </div>
+          {p.driveConnected && (
+            <div
+              className="h-[7px] w-[7px] flex-none rounded-full"
+              style={{ background: "var(--good)", boxShadow: "0 0 8px var(--good)" }}
+            />
+          )}
         </button>
 
         <div className="section-label px-2.5 pb-2 pt-4">Categories</div>

@@ -83,6 +83,11 @@ for every number and path. Decorative motion respects
   safe-tier categories you mark — enforced in Rust to the safe tier only.
 - **Logs every action** to a history view — "freed 23.4 GB on Aug 3", with
   automatic runs tagged `auto`.
+- **Google Drive, bring-your-own-keys**: paste your own OAuth Desktop client
+  in Settings and Alpheus shows your quota, finds exact duplicates by
+  md5 checksum (no downloads), and reclaims into Drive's 30-day Trash.
+  Tokens live in the macOS Keychain; nothing Google-related ships with
+  the app.
 
 ## Safety model
 

@@ -6,6 +6,7 @@
 
 mod disk;
 mod exec;
+mod google;
 mod history;
 mod scan;
 mod settings;
@@ -190,6 +191,7 @@ pub fn run() {
             None,
         ))
         .manage(ScanState::default())
+        .manage(google::GoogleState::default())
         .invoke_handler(tauri::generate_handler![
             disk_usage,
             scan,
@@ -197,7 +199,11 @@ pub fn run() {
             execute,
             history,
             get_settings,
-            set_settings
+            set_settings,
+            google::google_connect,
+            google::google_status,
+            google::google_token,
+            google::google_disconnect
         ])
         .setup(|app| {
             let initial = app

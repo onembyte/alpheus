@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useStorage } from "./hooks/useStorage";
 import { useSettings } from "./hooks/useSettings";
+import { useDrive } from "./hooks/useDrive";
 import { useTheme } from "./hooks/useTheme";
 import { cardColor, TIER_META, TIER_ORDER } from "./tiers";
 import type { Card, Tier } from "./types";
@@ -12,7 +13,9 @@ import CardRow from "./components/CardRow";
 import Sheet from "./components/Sheet";
 import HistoryPanel from "./components/HistoryPanel";
 import SettingsPanel from "./components/SettingsPanel";
+import DrivePanel from "./components/DrivePanel";
 import { cardMatches, isEmptyQuery, parseQuery } from "./search";
+import { fmtBytes } from "./format";
 import { fmtKB } from "./format";
 
 function ScanningState() {
@@ -55,6 +58,7 @@ function ScanningState() {
 
 export default function App() {
   const s = useStorage();
+  const d = useDrive();
   const { settings, update: updateSettings } = useSettings();
   const { mode, setMode } = useTheme();
   const [view, setView] = useState<View>("reclaim");
@@ -131,6 +135,16 @@ export default function App() {
             setFilter("all");
             setView("reclaim");
           }}
+          driveConnected={d.connected}
+          driveLabel={
+            d.connected
+              ? d.quota
+                ? `${fmtBytes(Math.max(0, d.quota.limitBytes - d.quota.usageBytes))} free of ${fmtBytes(d.quota.limitBytes)}`
+                : "connected · analyze to see quota"
+              : "connect in Settings"
+          }
+          driveActive={view === "drive"}
+          onSelectDrive={() => setView("drive")}
           settingsActive={view === "settings"}
           onOpenSettings={() => setView("settings")}
         />
@@ -174,7 +188,14 @@ export default function App() {
                 onMode={setMode}
                 settings={settings}
                 update={updateSettings}
+                googleConnected={d.connected}
+                googleBusy={d.busy}
+                googleError={d.error}
+                onGoogleConnect={d.connect}
+                onGoogleDisconnect={d.disconnect}
               />
+            ) : view === "drive" ? (
+              <DrivePanel d={d} onOpenSettings={() => setView("settings")} />
             ) : view === "history" ? (
               <HistoryPanel entries={s.history} />
             ) : s.scanning && !s.cards ? (

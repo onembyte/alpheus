@@ -1,6 +1,6 @@
 import { fmtKB } from "../format";
 
-export type View = "reclaim" | "history" | "settings";
+export type View = "reclaim" | "drive" | "history" | "settings";
 
 interface Props {
   view: View;
@@ -15,6 +15,7 @@ interface Props {
 
 const TABS: { key: View; label: string }[] = [
   { key: "reclaim", label: "Reclaim" },
+  { key: "drive", label: "Drive" },
   { key: "history", label: "History" },
 ];
 
@@ -27,14 +28,22 @@ export default function TopBar(p: Props) {
     >
       <div data-tauri-drag-region className="min-w-[178px]">
         <div data-tauri-drag-region className="text-[14px] font-semibold" style={{ color: "var(--txt)" }}>
-          {p.view === "reclaim" ? "Reclaim" : p.view === "history" ? "History" : "Settings"}
+          {p.view === "reclaim"
+            ? "Reclaim"
+            : p.view === "drive"
+              ? "Google Drive"
+              : p.view === "history"
+                ? "History"
+                : "Settings"}
         </div>
         <div data-tauri-drag-region className="mono text-[10.5px]" style={{ color: "var(--txt3)" }}>
           {p.view === "reclaim"
             ? `${fmtKB(p.reclaimableKb)} reclaimable · du actuals`
-            : p.view === "history"
-              ? `${p.historyCount} action${p.historyCount === 1 ? "" : "s"} logged`
-              : "appearance · about"}
+            : p.view === "drive"
+              ? "quota · duplicates · trash"
+              : p.view === "history"
+                ? `${p.historyCount} action${p.historyCount === 1 ? "" : "s"} logged`
+                : "general · appearance · google drive · about"}
         </div>
       </div>
 

@@ -54,6 +54,11 @@ interface Props {
   onMode: (m: ThemeMode) => void;
   settings: AppSettings | null;
   update: (patch: Partial<AppSettings>) => void;
+  googleConnected: boolean | null;
+  googleBusy: boolean;
+  googleError: string | null;
+  onGoogleConnect: (clientId: string, clientSecret: string) => Promise<boolean>;
+  onGoogleDisconnect: () => void;
 }
 
 const SCAN_INTERVALS: { label: string; secs: number }[] = [
@@ -110,8 +115,20 @@ const OPTIONS: { key: ThemeMode; label: string; sub: string; icon: React.ReactNo
   },
 ];
 
-export default function SettingsPanel({ mode, onMode, settings, update }: Props) {
+export default function SettingsPanel({
+  mode,
+  onMode,
+  settings,
+  update,
+  googleConnected,
+  googleBusy,
+  googleError,
+  onGoogleConnect,
+  onGoogleDisconnect,
+}: Props) {
   const [loginItem, setLoginItem] = useState<boolean | null>(null);
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
 
   useEffect(() => {
     isEnabled()
@@ -323,6 +340,99 @@ export default function SettingsPanel({ mode, onMode, settings, update }: Props)
           <div className="mono mt-2.5 text-[10.5px]" style={{ color: "var(--warn)" }}>
             automatic scanning is off — nothing will run until you pick an interval above
           </div>
+        )}
+      </div>
+
+      <div className="glass-card px-[18px] pb-[18px] pt-4">
+        <div className="section-label mb-1">Google Drive</div>
+        {googleConnected ? (
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-[12.5px] font-medium" style={{ color: "var(--good)" }}>
+                Connected
+              </div>
+              <div className="text-[11px]" style={{ color: "var(--txt3)" }}>
+                Open the Drive tab to analyze quota, duplicates and Trash. Tokens live in
+                the macOS Keychain.
+              </div>
+            </div>
+            <button
+              onClick={onGoogleDisconnect}
+              disabled={googleBusy}
+              className="glass-chip btn-focus h-8 flex-none rounded-lg px-4 text-[12px] font-semibold disabled:opacity-50"
+              style={{ color: "var(--danger)" }}
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="mb-3 text-[11.5px] leading-relaxed" style={{ color: "var(--txt3)" }}>
+              Bring your own OAuth client — nothing Google-related ships with Alpheus. At{" "}
+              <span className="mono selectable" style={{ color: "var(--txt2)" }}>
+                console.cloud.google.com
+              </span>
+              : create a project → enable the <b>Google Drive API</b> → OAuth consent screen
+              (External, Testing, add your Gmail as test user) → Credentials → OAuth client ID →{" "}
+              <b>Desktop app</b>. Paste both values here; they're stored only in your Keychain.
+            </div>
+            <div className="flex flex-col gap-2">
+              <input
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                placeholder="Client ID (…apps.googleusercontent.com)"
+                spellCheck={false}
+                className="mono inset-panel btn-focus selectable w-full rounded-[9px] px-3 py-2 text-[11.5px]"
+                style={{ color: "var(--txt)", border: "none" }}
+                aria-label="Google OAuth Client ID"
+              />
+              <input
+                value={clientSecret}
+                onChange={(e) => setClientSecret(e.target.value)}
+                placeholder="Client Secret"
+                type="password"
+                spellCheck={false}
+                className="mono inset-panel btn-focus selectable w-full rounded-[9px] px-3 py-2 text-[11.5px]"
+                style={{ color: "var(--txt)", border: "none" }}
+                aria-label="Google OAuth Client Secret"
+              />
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                onClick={async () => {
+                  if (await onGoogleConnect(clientId, clientSecret)) {
+                    setClientId("");
+                    setClientSecret("");
+                  }
+                }}
+                disabled={googleBusy || !clientId.trim() || !clientSecret.trim()}
+                className="btn-focus relative flex h-[30px] items-center overflow-hidden rounded-[9px] px-[15px] text-[12px] font-semibold disabled:opacity-50"
+                style={{
+                  background:
+                    "linear-gradient(180deg, color-mix(in srgb, var(--accent) 55%, transparent), color-mix(in srgb, var(--accent) 28%, transparent))",
+                  boxShadow:
+                    "inset 0 1px 0 rgba(255,255,255,.6), 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent)",
+                  color: "#fff",
+                  textShadow: "0 1px 2px rgba(0,0,0,.25)",
+                }}
+              >
+                {!googleBusy && <div className="sheen" />}
+                <span className="relative">
+                  {googleBusy ? "Waiting for the browser…" : "Connect Google Drive"}
+                </span>
+              </button>
+              {googleBusy && (
+                <span className="mono text-[10.5px]" style={{ color: "var(--txt3)" }}>
+                  finish the consent screen in your browser
+                </span>
+              )}
+            </div>
+            {googleError && (
+              <div className="mono mt-2.5 text-[10.5px]" style={{ color: "var(--danger)" }}>
+                {googleError}
+              </div>
+            )}
+          </>
         )}
       </div>
 

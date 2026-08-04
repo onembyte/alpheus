@@ -7,6 +7,8 @@ export function fmtKB(kb: number): string {
   return `${kb} KB`;
 }
 
+export const fmtBytes = (bytes: number): string => fmtKB(bytes / 1024);
+
 export function fmtDate(secs: number): string {
   return new Date(secs * 1000).toLocaleString(undefined, {
     month: "short",
