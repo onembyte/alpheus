@@ -51,4 +51,5 @@ export interface AppSettings {
   notify_below_gb: number;
   auto_clean: boolean;
   auto_clean_ids: string[];
+  last_auto_scan_ts: number;
 }

@@ -199,13 +199,12 @@ pub fn run() {
             // hysteresis, and the optional automatic rescan.
             let handle = app.handle().clone();
             std::thread::spawn(move || {
-                let mut last_scan = std::time::Instant::now();
                 let mut warned_low = false;
                 loop {
                     std::thread::sleep(std::time::Duration::from_secs(60));
                     update_tray(&handle);
 
-                    let (interval_secs, threshold_gb, auto_clean, auto_ids) = {
+                    let (interval_secs, threshold_gb, auto_clean, auto_ids, last_scan_ts) = {
                         let s = handle.state::<SettingsState>();
                         let s = s.0.lock().unwrap();
                         (
@@ -213,6 +212,7 @@ pub fn run() {
                             s.notify_below_gb,
                             s.auto_clean,
                             s.auto_clean_ids.clone(),
+                            s.last_auto_scan_ts,
                         )
                     };
 
@@ -228,8 +228,18 @@ pub fn run() {
                         warned_low = false;
                     }
 
-                    if interval_secs > 0 && last_scan.elapsed().as_secs() >= interval_secs {
-                        last_scan = std::time::Instant::now();
+                    if interval_secs > 0 && now_secs().saturating_sub(last_scan_ts) >= interval_secs
+                    {
+                        // Persist the timestamp so weekly/monthly cadences
+                        // survive restarts instead of resetting to "now".
+                        {
+                            let s = handle.state::<SettingsState>();
+                            let mut s = s.0.lock().unwrap();
+                            s.last_auto_scan_ts = now_secs();
+                            if let Ok(dir) = handle.path().app_data_dir() {
+                                settings::save(&dir, &s);
+                            }
+                        }
                         let mut cards = scan::scan_all();
 
                         // Automatic cleanup: only safe-tier, delete-action

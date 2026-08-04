@@ -16,6 +16,10 @@ pub struct AppSettings {
     /// restricts these to safe-tier, delete-action cards at run time.
     #[serde(default)]
     pub auto_clean_ids: Vec<String>,
+    /// Unix seconds of the last automatic scan — persisted so weekly/monthly
+    /// schedules survive app restarts and sleep instead of resetting.
+    #[serde(default)]
+    pub last_auto_scan_ts: u64,
 }
 
 impl Default for AppSettings {
@@ -25,6 +29,7 @@ impl Default for AppSettings {
             notify_below_gb: 15.0,
             auto_clean: false,
             auto_clean_ids: vec![],
+            last_auto_scan_ts: 0,
         }
     }
 }

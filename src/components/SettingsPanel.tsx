@@ -12,8 +12,10 @@ interface Props {
 const SCAN_INTERVALS: { label: string; secs: number }[] = [
   { label: "Off", secs: 0 },
   { label: "Hourly", secs: 3600 },
-  { label: "Every 6 h", secs: 21600 },
+  { label: "6 h", secs: 21600 },
   { label: "Daily", secs: 86400 },
+  { label: "Weekly", secs: 604800 },
+  { label: "Monthly", secs: 2592000 },
 ];
 
 const OPTIONS: { key: ThemeMode; label: string; sub: string; icon: React.ReactNode }[] = [
