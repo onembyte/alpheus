@@ -102,7 +102,20 @@ fn set_settings(
 ) -> Result<(), String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     settings::save(&dir, &new_settings);
-    apply_activation_policy(&app, new_settings.menu_bar_only);
+    let was_menu_bar_only = state.0.lock().unwrap().menu_bar_only;
+    if new_settings.menu_bar_only != was_menu_bar_only {
+        apply_activation_policy(&app, new_settings.menu_bar_only);
+        // Entering menu-bar mode tucks the window into the tray; leaving it
+        // brings the window straight back.
+        if let Some(w) = app.get_webview_window("main") {
+            if new_settings.menu_bar_only {
+                let _ = w.hide();
+            } else {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }
+    }
     *state.0.lock().unwrap() = new_settings;
     update_tray(&app); // threshold may have changed the ⚠️ state
     Ok(())
@@ -194,6 +207,12 @@ pub fn run() {
                 .unwrap_or_default();
             let initial_threshold = initial.notify_below_gb;
             apply_activation_policy(app.handle(), initial.menu_bar_only);
+            // Menu-bar-only launches (e.g. at login) start in the tray.
+            if initial.menu_bar_only {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.hide();
+                }
+            }
             app.manage(SettingsState(Mutex::new(initial)));
 
             let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?;
