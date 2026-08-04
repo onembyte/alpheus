@@ -14,10 +14,10 @@
       {
         "label": "main",
         "title": "Storage Manager",
-        "width": 1000,
-        "height": 740,
-        "minWidth": 820,
-        "minHeight": 600,
+        "width": 1180,
+        "height": 780,
+        "minWidth": 980,
+        "minHeight": 640,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true
       }

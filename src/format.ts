@@ -15,3 +15,8 @@ export function fmtDate(secs: number): string {
     minute: "2-digit",
   });
 }
+
+/** `/Users/<name>/…` → `~/…` for compact mono path lines. */
+export function shortenPath(p: string): string {
+  return p.replace(/^\/Users\/[^/]+/, "~");
+}

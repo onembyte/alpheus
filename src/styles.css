@@ -1,8 +1,77 @@
 @import "tailwindcss";
 
+/* ─── Strata design tokens (from the Claude Design project) ─────────────── */
+
 :root {
-  color-scheme: dark;
+  --blur: 44px;
+  --sat: 180%;
+  --txt: rgba(255, 255, 255, 0.95);
+  --txt2: rgba(255, 255, 255, 0.6);
+  --txt3: rgba(255, 255, 255, 0.38);
+  --glass-a: rgba(255, 255, 255, 0.11);
+  --glass-b: rgba(255, 255, 255, 0.028);
+  --edge: rgba(255, 255, 255, 0.15);
+  --edge-hi: rgba(255, 255, 255, 0.34);
+  --edge-lo: rgba(255, 255, 255, 0.05);
+  --panel: rgba(255, 255, 255, 0.055);
+  --panel-edge: rgba(255, 255, 255, 0.085);
+  --win: rgba(20, 22, 28, 0.52);
+  --side: rgba(255, 255, 255, 0.055);
+  --track: rgba(255, 255, 255, 0.1);
+  --hair: rgba(255, 255, 255, 0.08);
+  --sel: rgba(126, 158, 255, 0.3);
+  --sel-edge: rgba(160, 185, 255, 0.45);
+  --accent: #8aa6ff;
+  --warn: #ffa94d;
+  --danger: #ff6b60;
+  --good: #4be0a8;
+  --inset-panel: rgba(0, 0, 0, 0.16);
+  --w1: #0a0b0f;
+  --w2: #1b3a4a;
+  --w3: #5b2b57;
+  --w4: #7a5a2a;
+  --w5: #123a3a;
+  --c1: #7e9eff;
+  --c2: #4fd8c8;
+  --c3: #b58cff;
+  --c4: #ffb454;
+  --c5: #ff7fb8;
+  --c6: #5fc9f0;
+  --c7: #9aa6bc;
+  --c8: #67d98a;
+  --c9: #e0e6f2;
 }
+
+:root[data-theme="light"] {
+  --txt: rgba(16, 18, 24, 0.92);
+  --txt2: rgba(16, 18, 24, 0.56);
+  --txt3: rgba(16, 18, 24, 0.34);
+  --glass-a: rgba(255, 255, 255, 0.78);
+  --glass-b: rgba(255, 255, 255, 0.42);
+  --edge: rgba(255, 255, 255, 0.85);
+  --edge-hi: rgba(255, 255, 255, 0.95);
+  --edge-lo: rgba(16, 18, 24, 0.06);
+  --panel: rgba(255, 255, 255, 0.58);
+  --panel-edge: rgba(255, 255, 255, 0.85);
+  --win: rgba(244, 246, 251, 0.58);
+  --side: rgba(255, 255, 255, 0.42);
+  --track: rgba(16, 18, 24, 0.09);
+  --hair: rgba(16, 18, 24, 0.07);
+  --sel: rgba(96, 132, 246, 0.24);
+  --sel-edge: rgba(96, 132, 246, 0.34);
+  --accent: #3c63e8;
+  --warn: #c4680c;
+  --danger: #d6382c;
+  --good: #0e9a66;
+  --inset-panel: rgba(16, 18, 24, 0.05);
+  --w1: #dfe6ef;
+  --w2: #a8d6e8;
+  --w3: #e3c0dd;
+  --w4: #f3e0bd;
+  --w5: #bfe6df;
+}
+
+/* ─── Base ──────────────────────────────────────────────────────────────── */
 
 html,
 body,
@@ -11,71 +80,215 @@ body,
 }
 
 body {
-  background-color: #0a0a0a;
-  color: #f5f5f5;
+  margin: 0;
+  overflow: hidden;
+  background: var(--w1);
+  color: var(--txt);
   font-family:
-    ui-sans-serif,
     -apple-system,
-    system-ui,
+    "SF Pro Display",
     "SF Pro Text",
+    "Helvetica Neue",
+    system-ui,
     sans-serif;
   -webkit-font-smoothing: antialiased;
   user-select: none;
   cursor: default;
-  overflow: hidden;
 }
 
-/* Paths and proof blocks are the one place selection makes sense */
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
 .selectable {
   user-select: text;
   cursor: text;
 }
 
-/* Keyboard-only focus ring; invisible for mouse users */
+/* ─── Strata surfaces ───────────────────────────────────────────────────── */
+
+.glass-card {
+  border-radius: 19px;
+  background: linear-gradient(150deg, var(--glass-a), var(--glass-b));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    inset 0 1px 0 var(--edge-hi),
+    inset 0 -1px 0 var(--edge-lo),
+    0 0 0 1px var(--edge-lo);
+}
+
+.glass-chip {
+  border-radius: 9px;
+  background: var(--glass-a);
+  box-shadow:
+    inset 0 1px 0 var(--edge-hi),
+    0 0 0 1px var(--edge-lo);
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
+}
+.glass-chip:hover {
+  background: var(--track);
+}
+
+.inset-panel {
+  border-radius: 13px;
+  background: var(--inset-panel);
+  box-shadow: 0 0 0 1px var(--edge-lo);
+}
+
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--txt3);
+}
+
+.hairline-b {
+  border-bottom: 1px solid var(--hair);
+}
+
 .btn-focus {
   outline: none;
 }
 .btn-focus:focus-visible {
-  box-shadow: 0 0 0 2px rgb(56 189 248 / 0.7);
+  box-shadow: 0 0 0 2px var(--sel-edge);
 }
 
-@keyframes card-enter {
+/* ─── Motion (Strata keyframes) ─────────────────────────────────────────── */
+
+@keyframes fadeUp {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
-.card-enter {
-  animation: card-enter 180ms ease-out both;
+.fade-up {
+  animation: fadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes modal-enter {
+@keyframes barIn {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.bar-in {
+  animation: barIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: left;
+}
+
+@keyframes ringIn {
   from {
     opacity: 0;
-    transform: scale(0.97);
+    transform: rotate(-38deg) scale(0.84);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: rotate(0) scale(1);
   }
 }
-.modal-enter {
-  animation: modal-enter 140ms ease-out both;
+.ring-in {
+  animation: ringIn 1.05s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Indeterminate scan progress along the header's bottom edge */
-@keyframes scan-slide {
+@keyframes sheetIn {
   from {
-    transform: translateX(-100%);
+    opacity: 0;
+    transform: translate(-50%, -34px) scale(0.97);
   }
   to {
-    transform: translateX(400%);
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
   }
 }
-.scan-indicator {
-  animation: scan-slide 1.1s ease-in-out infinite;
+.sheet-in {
+  animation: sheetIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes sheen {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  55%,
+  100% {
+    transform: translateX(320%) skewX(-18deg);
+  }
+}
+.sheen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 34%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: sheen 4.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.dot-pulse {
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+  50% {
+    transform: translate3d(-3%, 2%, 0) scale(1.12);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+}
+@keyframes drift2 {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1.1);
+  }
+  50% {
+    transform: translate3d(4%, -3%, 0) rotate(6deg) scale(1.18);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1.1);
+  }
+}
+.drift-a {
+  animation: drift 26s ease-in-out infinite;
+}
+.drift-b {
+  animation: drift2 34s ease-in-out infinite;
+}
+.drift-c {
+  animation: drift 30s ease-in-out infinite reverse;
+}
+.drift-d {
+  animation: drift2 24s ease-in-out infinite reverse;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin-slow {
+  animation: spin 22s linear infinite;
+}
+.spin-fast {
+  animation: spin 1.1s linear infinite;
 }
