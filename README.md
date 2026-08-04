@@ -20,9 +20,15 @@
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" />
 </p>
 
-<!-- screenshot: drop docs/screenshot.png and uncomment
-<p align="center"><img src="docs/screenshot.png" width="720" alt="Main window" /></p>
--->
+<p align="center">
+  <img src="docs/design/overview.png" width="704" alt="Overview — allocation ring, capacity bar, mounted volumes" />
+</p>
+<p align="center">
+  <img src="docs/design/breakdown.png" width="284" alt="Breakdown by category" />
+  <img src="docs/design/duplicates-inspector.png" width="284" alt="Duplicates and volume inspector" />
+  <img src="docs/design/inspector-actions.png" width="130" alt="Snapshots and quick actions" />
+</p>
+<p align="center"><sub><em>Strata</em>, the liquid-glass design system this app implements — designed in Claude Design.</sub></p>
 
 ## Why
 
