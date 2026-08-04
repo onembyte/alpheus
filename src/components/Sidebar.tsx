@@ -88,7 +88,7 @@ export default function Sidebar(p: Props) {
         </span>
         <div className="grow" />
         <span className="mono text-[9.5px]" style={{ color: "var(--txt3)" }}>
-          0.1.0
+          {__APP_VERSION__}
         </span>
       </div>
 
