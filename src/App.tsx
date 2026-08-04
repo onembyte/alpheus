@@ -234,7 +234,7 @@ export default function App() {
               <svg width="11" height="11" viewBox="0 0 10 10" fill="none">
                 <path
                   d="M1.6 5.2 3.9 7.5 8.4 2.6"
-                  stroke="#04231a"
+                  stroke="var(--on-good)"
                   strokeWidth="1.9"
                   strokeLinecap="round"
                   strokeLinejoin="round"

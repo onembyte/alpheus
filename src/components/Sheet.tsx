@@ -11,31 +11,14 @@ interface Props {
   onCancel: () => void;
 }
 
-const VARIANT: Record<
-  DryRun["method"],
-  { color: string; label: string; fg: string; grad: string; ring: string }
-> = {
-  trash: {
-    color: "var(--good)",
-    label: "Move to Trash",
-    fg: "#04231a",
-    grad: "linear-gradient(180deg, rgba(75,224,168,.62), rgba(75,224,168,.30))",
-    ring: "rgba(75,224,168,.45)",
-  },
-  delete: {
-    color: "var(--danger)",
-    label: "Delete permanently",
-    fg: "#fff",
-    grad: "linear-gradient(180deg, rgba(255,107,96,.62), rgba(255,107,96,.32))",
-    ring: "rgba(255,107,96,.45)",
-  },
-  command: {
-    color: "var(--accent)",
-    label: "Run command",
-    fg: "#fff",
-    grad: "linear-gradient(180deg, rgba(138,166,255,.62), rgba(138,166,255,.32))",
-    ring: "rgba(138,166,255,.45)",
-  },
+const grad = (color: string) =>
+  `linear-gradient(180deg, color-mix(in srgb, ${color} 62%, transparent), color-mix(in srgb, ${color} 31%, transparent))`;
+const ring = (color: string) => `color-mix(in srgb, ${color} 45%, transparent)`;
+
+const VARIANT: Record<DryRun["method"], { color: string; label: string; fg: string }> = {
+  trash: { color: "var(--good)", label: "Move to Trash", fg: "var(--on-good)" },
+  delete: { color: "var(--danger)", label: "Delete permanently", fg: "#fff" },
+  command: { color: "var(--accent)", label: "Run command", fg: "#fff" },
 };
 
 const METHOD_TEXT: Record<DryRun["method"], string> = {
@@ -241,8 +224,8 @@ export default function Sheet({ card, dryRun, freeKb, busy, onConfirm, onCancel 
             disabled={busy || (needsAck && !acked)}
             className="btn-focus relative flex h-[31px] items-center overflow-hidden rounded-[9px] px-[17px] text-[12px] font-semibold transition-opacity disabled:opacity-40"
             style={{
-              background: v.grad,
-              boxShadow: `inset 0 1px 0 rgba(255,255,255,.5), 0 0 0 1px ${v.ring}, 0 8px 20px -8px ${v.ring}`,
+              background: grad(v.color),
+              boxShadow: `inset 0 1px 0 rgba(255,255,255,.5), 0 0 0 1px ${ring(v.color)}, 0 8px 20px -8px ${ring(v.color)}`,
               color: v.fg,
             }}
           >

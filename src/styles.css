@@ -25,6 +25,7 @@
   --warn: #ffa94d;
   --danger: #ff6b60;
   --good: #4be0a8;
+  --on-good: #04231a;
   --inset-panel: rgba(0, 0, 0, 0.16);
   --w1: #0a0b0f;
   --w2: #1b3a4a;
@@ -63,6 +64,7 @@
   --warn: #c4680c;
   --danger: #d6382c;
   --good: #0e9a66;
+  --on-good: #ffffff;
   --inset-panel: rgba(16, 18, 24, 0.05);
   --w1: #dfe6ef;
   --w2: #a8d6e8;
@@ -103,6 +105,20 @@ body {
 .selectable {
   user-select: text;
   cursor: text;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--track);
+  border-radius: 5px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* ─── Strata surfaces ───────────────────────────────────────────────────── */

@@ -67,9 +67,10 @@ export default function TopBar(p: Props) {
         disabled={p.scanning}
         className="btn-focus relative flex h-[30px] items-center gap-[7px] overflow-hidden rounded-[9px] px-[15px] text-[12px] font-semibold disabled:opacity-70"
         style={{
-          background: "linear-gradient(180deg, rgba(138,166,255,.55), rgba(138,166,255,.28))",
+          background:
+            "linear-gradient(180deg, color-mix(in srgb, var(--accent) 55%, transparent), color-mix(in srgb, var(--accent) 28%, transparent))",
           boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,.6), 0 0 0 1px rgba(138,166,255,.4), 0 6px 18px -6px rgba(90,120,255,.6)",
+            "inset 0 1px 0 rgba(255,255,255,.6), 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 6px 18px -6px color-mix(in srgb, var(--accent) 60%, transparent)",
           color: "#fff",
           textShadow: "0 1px 2px rgba(0,0,0,.25)",
         }}
