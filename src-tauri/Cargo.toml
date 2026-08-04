@@ -1,0 +1,23 @@
+[package]
+name = "storage-manager"
+version = "0.1.0"
+description = "Honest storage pane for a chronically full MacBook"
+authors = ["Franco Michetti"]
+edition = "2021"
+
+[lib]
+name = "storage_manager_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+trash = "5"
+
+[profile.release]
+strip = true
+lto = true
