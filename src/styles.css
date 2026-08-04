@@ -292,3 +292,20 @@ body {
 .spin-fast {
   animation: spin 1.1s linear infinite;
 }
+
+/* Decorative motion off under reduced-motion; state spinners stay. */
+@media (prefers-reduced-motion: reduce) {
+  .drift-a,
+  .drift-b,
+  .drift-c,
+  .drift-d,
+  .sheen,
+  .spin-slow,
+  .dot-pulse,
+  .ring-in,
+  .bar-in,
+  .fade-up,
+  .sheet-in {
+    animation: none;
+  }
+}

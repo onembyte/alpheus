@@ -92,11 +92,11 @@ export default function OverviewPanel({ usage, cards, onFreeUp }: Props) {
               strokeLinecap="round"
             />
           </svg>
-          <div className="flex-1">
-            <div className="text-[12.5px] font-semibold" style={{ color: "var(--txt)" }}>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[12.5px] font-semibold" style={{ color: "var(--txt)" }}>
               Startup disk almost full — {fmtKB(usage.free_kb)} available ({freePct.toFixed(2)}%)
             </div>
-            <div className="mono text-[11px]" style={{ color: "var(--txt2)" }}>
+            <div className="mono truncate text-[11px]" style={{ color: "var(--txt2)" }}>
               {fmtKB(reclaimable)} reclaimable · {fmtKB(safeKb)} safe one-click · no restart needed
             </div>
           </div>
@@ -136,7 +136,9 @@ export default function OverviewPanel({ usage, cards, onFreeUp }: Props) {
                     strokeWidth="25"
                     strokeDasharray={`${Math.max(0, s.len - 1.5)} ${RING_C}`}
                     strokeDashoffset={s.offset}
-                  />
+                  >
+                    <title>{`${s.label} — ${fmtKB(s.kb)}`}</title>
+                  </circle>
                 ))}
               </g>
             </svg>
@@ -174,9 +176,12 @@ export default function OverviewPanel({ usage, cards, onFreeUp }: Props) {
         {/* capacity bar + legend */}
         <div className="glass-card min-w-0 flex-1 p-[18px]">
           <div className="mb-3 flex items-baseline justify-between gap-3">
-            <div className="section-label">Capacity</div>
-            <div className="mono text-[10px]" style={{ color: "var(--txt3)" }}>
-              {fmtKB(reclaimable)} reclaimable · {segs.length - 1} categories
+            <div className="section-label flex-none">Capacity</div>
+            <div
+              className="mono min-w-0 truncate text-right text-[10px]"
+              style={{ color: "var(--txt3)" }}
+            >
+              {fmtKB(reclaimable)} reclaimable
             </div>
           </div>
 
@@ -190,6 +195,7 @@ export default function OverviewPanel({ usage, cards, onFreeUp }: Props) {
                   <div
                     key={s.key}
                     className="bar-in"
+                    title={`${s.label} — ${fmtKB(s.kb)}`}
                     style={{
                       width: `${(s.kb / usage.total_kb) * 100}%`,
                       background: s.color,

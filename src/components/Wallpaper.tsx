@@ -7,8 +7,8 @@ export default function Wallpaper() {
   return (
     <>
       <div
-        className="pointer-events-none absolute"
-        style={{ inset: "-14%", filter: "blur(70px)", opacity: 0.95 }}
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        style={{ filter: "blur(70px)", opacity: 0.95 }}
       >
         <div
           className="drift-a absolute rounded-full"

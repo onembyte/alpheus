@@ -25,8 +25,11 @@ export default function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
   return (
     <div className="glass-card fade-up px-[18px] pb-1 pt-4">
       <div className="mb-1.5 flex items-baseline justify-between gap-3">
-        <div className="section-label">Every action</div>
-        <div className="mono text-[10.5px]" style={{ color: "var(--txt3)" }}>
+        <div className="section-label min-w-0 truncate">Every action</div>
+        <div
+          className="mono flex-none whitespace-nowrap text-[10.5px]"
+          style={{ color: "var(--txt3)" }}
+        >
           {fmtKB(total)} reclaimed across {entries.length} action{entries.length === 1 ? "" : "s"}
         </div>
       </div>
