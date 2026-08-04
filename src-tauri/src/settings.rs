@@ -3,12 +3,19 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct AppSettings {
     /// Seconds between automatic background scans; 0 disables them.
     pub auto_scan_secs: u64,
     /// Notify (and warn in the tray) when free space drops below this many GB.
     pub notify_below_gb: f64,
+    /// Master switch: clean marked categories right after an automatic scan.
+    #[serde(default)]
+    pub auto_clean: bool,
+    /// Card ids the user marked for automatic cleanup. The executor still
+    /// restricts these to safe-tier, delete-action cards at run time.
+    #[serde(default)]
+    pub auto_clean_ids: Vec<String>,
 }
 
 impl Default for AppSettings {
@@ -16,6 +23,8 @@ impl Default for AppSettings {
         Self {
             auto_scan_secs: 0,
             notify_below_gb: 15.0,
+            auto_clean: false,
+            auto_clean_ids: vec![],
         }
     }
 }

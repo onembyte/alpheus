@@ -51,22 +51,32 @@ export function useStorage() {
     refreshHistory();
   }, [refreshUsage, rescan, refreshHistory]);
 
-  // Background auto-scans (Settings → Automatic scanning) push fresh cards.
-  useEffect(() => {
-    const un = listen<Card[]>("auto-scan", (e) => {
-      setCards(e.payload);
-      refreshUsage();
-    });
-    return () => {
-      un.then((f) => f());
-    };
-  }, [refreshUsage]);
-
   const showToast = useCallback((msg: string) => {
     window.clearTimeout(toastTimer.current);
     setToast(msg);
     toastTimer.current = window.setTimeout(() => setToast(null), 6000);
   }, []);
+
+  // Background auto-scans (Settings → Automatic scanning) push fresh cards;
+  // auto-cleanups announce what they freed and land in History.
+  useEffect(() => {
+    const unScan = listen<Card[]>("auto-scan", (e) => {
+      setCards(e.payload);
+      refreshUsage();
+    });
+    const unClean = listen<{ freed_kb: number; count: number }>("auto-clean", (e) => {
+      const gb = (e.payload.freed_kb / 1048576).toFixed(1);
+      showToast(
+        `Auto-cleaned ${gb} GB across ${e.payload.count} categor${e.payload.count === 1 ? "y" : "ies"}.`,
+      );
+      refreshHistory();
+      refreshUsage();
+    });
+    return () => {
+      unScan.then((f) => f());
+      unClean.then((f) => f());
+    };
+  }, [refreshUsage, refreshHistory, showToast]);
 
   const openCard = useCallback(async (card: Card) => {
     try {

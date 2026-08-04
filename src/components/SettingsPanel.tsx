@@ -1,10 +1,12 @@
 import type { ThemeMode } from "../hooks/useTheme";
-import { useSettings } from "../hooks/useSettings";
+import type { AppSettings } from "../types";
 import LogoMark from "./LogoMark";
 
 interface Props {
   mode: ThemeMode;
   onMode: (m: ThemeMode) => void;
+  settings: AppSettings | null;
+  update: (patch: Partial<AppSettings>) => void;
 }
 
 const SCAN_INTERVALS: { label: string; secs: number }[] = [
@@ -59,8 +61,7 @@ const OPTIONS: { key: ThemeMode; label: string; sub: string; icon: React.ReactNo
   },
 ];
 
-export default function SettingsPanel({ mode, onMode }: Props) {
-  const { settings, update } = useSettings();
+export default function SettingsPanel({ mode, onMode, settings, update }: Props) {
   return (
     <div className="fade-up mx-auto flex w-full max-w-[620px] flex-col gap-4">
       <div className="glass-card px-[18px] pb-[18px] pt-4">
@@ -169,6 +170,59 @@ export default function SettingsPanel({ mode, onMode }: Props) {
             GB
           </span>
         </div>
+      </div>
+
+      <div className="glass-card px-[18px] pb-[18px] pt-4">
+        <div className="section-label mb-1">Automatic cleanup</div>
+        <div className="mb-3.5 text-[11.5px]" style={{ color: "var(--txt3)" }}>
+          When an automatic scan finds safe-tier categories you've marked{" "}
+          <span className="font-semibold" style={{ color: "var(--txt2)" }}>
+            Auto
+          </span>{" "}
+          on their row, they're cleaned right away — same Trash-first rules as a manual
+          click, and every run lands in History. Only the green safe tier can auto-clean;
+          command-based cards (like Homebrew) stay manual.
+        </div>
+        <div className="flex items-center gap-2">
+          {[
+            { label: "Off", value: false },
+            { label: "On", value: true },
+          ].map((o) => {
+            const active = (settings?.auto_clean ?? false) === o.value;
+            return (
+              <button
+                key={o.label}
+                disabled={!settings}
+                onClick={() => update({ auto_clean: o.value })}
+                className="btn-focus rounded-[11px] px-5 py-2 text-[12px] font-semibold transition-all hover:bg-(--track) disabled:opacity-50"
+                style={
+                  active
+                    ? {
+                        color: "var(--txt)",
+                        background: "var(--sel)",
+                        boxShadow: "inset 0 1px 0 var(--edge-hi), 0 0 0 1px var(--sel-edge)",
+                      }
+                    : {
+                        color: "var(--txt2)",
+                        background: "var(--panel)",
+                        boxShadow: "0 0 0 1px var(--panel-edge)",
+                      }
+                }
+              >
+                {o.label}
+              </button>
+            );
+          })}
+          <span className="mono ml-1 text-[10.5px]" style={{ color: "var(--txt3)" }}>
+            {settings?.auto_clean_ids.length ?? 0} categor
+            {(settings?.auto_clean_ids.length ?? 0) === 1 ? "y" : "ies"} marked
+          </span>
+        </div>
+        {settings?.auto_clean && settings.auto_scan_secs === 0 && (
+          <div className="mono mt-2.5 text-[10.5px]" style={{ color: "var(--warn)" }}>
+            automatic scanning is off — nothing will run until you pick an interval above
+          </div>
+        )}
       </div>
 
       <div className="glass-card flex items-center gap-4 px-[18px] py-4">

@@ -43,9 +43,12 @@ export interface HistoryEntry {
   title: string;
   freed_kb: number;
   method: string;
+  auto: boolean;
 }
 
 export interface AppSettings {
   auto_scan_secs: number;
   notify_below_gb: number;
+  auto_clean: boolean;
+  auto_clean_ids: string[];
 }

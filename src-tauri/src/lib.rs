@@ -73,6 +73,7 @@ fn execute(id: String, app: AppHandle, state: State<ScanState>) -> Result<ExecRe
                 title: card.title.clone(),
                 freed_kb: result.freed_kb,
                 method: result.method.clone(),
+                auto: false,
             },
         );
     }
@@ -90,7 +91,7 @@ fn history(app: AppHandle) -> Vec<HistoryEntry> {
 
 #[tauri::command]
 fn get_settings(state: State<SettingsState>) -> AppSettings {
-    *state.0.lock().unwrap()
+    state.0.lock().unwrap().clone()
 }
 
 #[tauri::command]
@@ -99,9 +100,9 @@ fn set_settings(
     app: AppHandle,
     state: State<SettingsState>,
 ) -> Result<(), String> {
-    *state.0.lock().unwrap() = new_settings;
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     settings::save(&dir, &new_settings);
+    *state.0.lock().unwrap() = new_settings;
     update_tray(&app); // threshold may have changed the ⚠️ state
     Ok(())
 }
@@ -169,13 +170,14 @@ pub fn run() {
                 .app_data_dir()
                 .map(|d| settings::load(&d))
                 .unwrap_or_default();
+            let initial_threshold = initial.notify_below_gb;
             app.manage(SettingsState(Mutex::new(initial)));
 
             let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?;
             TrayIconBuilder::with_id("main-tray")
                 .icon(icon)
                 .icon_as_template(true)
-                .title(tray_title(&disk::usage(), initial.notify_below_gb))
+                .title(tray_title(&disk::usage(), initial_threshold))
                 .tooltip("Storage Manager")
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
@@ -203,10 +205,15 @@ pub fn run() {
                     std::thread::sleep(std::time::Duration::from_secs(60));
                     update_tray(&handle);
 
-                    let (interval_secs, threshold_gb) = {
+                    let (interval_secs, threshold_gb, auto_clean, auto_ids) = {
                         let s = handle.state::<SettingsState>();
                         let s = s.0.lock().unwrap();
-                        (s.auto_scan_secs, s.notify_below_gb)
+                        (
+                            s.auto_scan_secs,
+                            s.notify_below_gb,
+                            s.auto_clean,
+                            s.auto_clean_ids.clone(),
+                        )
                     };
 
                     let free_gb = disk::usage().free_kb as f64 / (1024.0 * 1024.0);
@@ -223,7 +230,57 @@ pub fn run() {
 
                     if interval_secs > 0 && last_scan.elapsed().as_secs() >= interval_secs {
                         last_scan = std::time::Instant::now();
-                        let cards = scan::scan_all();
+                        let mut cards = scan::scan_all();
+
+                        // Automatic cleanup: only safe-tier, delete-action
+                        // cards the user marked — enforced here regardless of
+                        // what the settings file claims. Same executor, same
+                        // denylist and trash rules as a manual click.
+                        if auto_clean {
+                            let mut freed_kb: u64 = 0;
+                            let mut cleaned: u32 = 0;
+                            cards.retain(|card| {
+                                let eligible = card.tier == scan::Tier::Safe
+                                    && card.action == scan::ActionKind::Delete
+                                    && auto_ids.contains(&card.id);
+                                if !eligible {
+                                    return true;
+                                }
+                                match exec::execute(card) {
+                                    Ok(res) => {
+                                        freed_kb += res.freed_kb;
+                                        cleaned += 1;
+                                        if let Ok(dir) = handle.path().app_data_dir() {
+                                            history::append(
+                                                &dir,
+                                                HistoryEntry {
+                                                    timestamp: now_secs(),
+                                                    card_id: card.id.clone(),
+                                                    title: card.title.clone(),
+                                                    freed_kb: res.freed_kb,
+                                                    method: res.method.clone(),
+                                                    auto: true,
+                                                },
+                                            );
+                                        }
+                                        false // cleaned — drop from the list
+                                    }
+                                    Err(_) => true,
+                                }
+                            });
+                            if cleaned > 0 {
+                                notify(&format!(
+                                    "Auto-cleaned {:.1} GB across {cleaned} categor{}",
+                                    freed_kb as f64 / (1024.0 * 1024.0),
+                                    if cleaned == 1 { "y" } else { "ies" }
+                                ));
+                                let _ = handle.emit(
+                                    "auto-clean",
+                                    serde_json::json!({ "freed_kb": freed_kb, "count": cleaned }),
+                                );
+                            }
+                        }
+
                         let state = handle.state::<ScanState>();
                         *state.0.lock().unwrap() =
                             cards.iter().map(|c| (c.id.clone(), c.clone())).collect();

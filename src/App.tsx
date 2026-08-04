@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useStorage } from "./hooks/useStorage";
+import { useSettings } from "./hooks/useSettings";
 import { useTheme } from "./hooks/useTheme";
 import { cardColor, TIER_META, TIER_ORDER } from "./tiers";
 import type { Card, Tier } from "./types";
@@ -53,9 +54,18 @@ function ScanningState() {
 
 export default function App() {
   const s = useStorage();
+  const { settings, update: updateSettings } = useSettings();
   const { mode, setMode } = useTheme();
   const [view, setView] = useState<View>("reclaim");
   const [filter, setFilter] = useState<TierFilter>("all");
+
+  const toggleAuto = (id: string) => {
+    if (!settings) return;
+    const ids = settings.auto_clean_ids.includes(id)
+      ? settings.auto_clean_ids.filter((x) => x !== id)
+      : [...settings.auto_clean_ids, id];
+    updateSettings({ auto_clean_ids: ids });
+  };
 
   // Cmd+, opens Settings, like any other macOS app.
   useEffect(() => {
@@ -152,7 +162,12 @@ export default function App() {
             )}
 
             {view === "settings" ? (
-              <SettingsPanel mode={mode} onMode={setMode} />
+              <SettingsPanel
+                mode={mode}
+                onMode={setMode}
+                settings={settings}
+                update={updateSettings}
+              />
             ) : view === "history" ? (
               <HistoryPanel entries={s.history} />
             ) : s.scanning && !s.cards ? (
@@ -224,6 +239,12 @@ export default function App() {
                           color={colorOf(card)}
                           maxKb={maxKb}
                           onAction={s.openCard}
+                          autoOn={
+                            card.tier === "safe" && card.action === "delete" && settings
+                              ? settings.auto_clean_ids.includes(card.id)
+                              : null
+                          }
+                          onToggleAuto={toggleAuto}
                         />
                       ))}
                     </section>

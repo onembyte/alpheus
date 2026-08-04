@@ -11,6 +11,9 @@ pub struct HistoryEntry {
     pub title: String,
     pub freed_kb: u64,
     pub method: String,
+    /// True when an automatic cleanup ran this, not a click.
+    #[serde(default)]
+    pub auto: bool,
 }
 
 pub fn load(dir: &Path) -> Vec<HistoryEntry> {

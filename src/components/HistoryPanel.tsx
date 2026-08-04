@@ -62,6 +62,7 @@ export default function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
             className="mono w-[110px] flex-none text-right text-[10.5px]"
             style={{ color: "var(--txt3)" }}
           >
+            {e.auto ? "auto · " : ""}
             {METHOD_LABEL[e.method] ?? e.method}
           </span>
           <span

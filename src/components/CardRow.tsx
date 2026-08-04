@@ -8,9 +8,12 @@ interface Props {
   color: string;
   maxKb: number;
   onAction: (card: Card) => void;
+  /** null → card not eligible for automatic cleanup (chip hidden). */
+  autoOn: boolean | null;
+  onToggleAuto: (id: string) => void;
 }
 
-export default function CardRow({ card, color, maxKb, onAction }: Props) {
+export default function CardRow({ card, color, maxKb, onAction, autoOn, onToggleAuto }: Props) {
   const [expanded, setExpanded] = useState(false);
   const actionable = card.action !== "explain";
   const pct = maxKb > 0 ? Math.max(2, (card.size_kb / maxKb) * 100) : 0;
@@ -57,7 +60,37 @@ export default function CardRow({ card, color, maxKb, onAction }: Props) {
         <div className="hidden w-[120px] flex-none justify-end lg:flex">
           <TierBadge tier={card.tier} />
         </div>
-        <div className="flex w-[86px] flex-none justify-end">
+        <div className="flex w-[136px] flex-none items-center justify-end gap-1.5">
+          {autoOn !== null && (
+            <button
+              onClick={() => onToggleAuto(card.id)}
+              title={
+                autoOn
+                  ? "Automatic cleanup will clean this category — click to unmark"
+                  : "Mark for automatic cleanup (Settings → Automatic cleanup)"
+              }
+              className="btn-focus flex h-7 items-center gap-1 rounded-lg px-2 text-[10.5px] font-semibold transition-all"
+              style={
+                autoOn
+                  ? {
+                      color: "var(--txt)",
+                      background: "var(--sel)",
+                      boxShadow: "inset 0 1px 0 var(--edge-hi), 0 0 0 1px var(--sel-edge)",
+                    }
+                  : {
+                      color: "var(--txt3)",
+                      background: "var(--panel)",
+                      boxShadow: "0 0 0 1px var(--panel-edge)",
+                    }
+              }
+            >
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ background: autoOn ? "var(--accent)" : "var(--txt3)" }}
+              />
+              Auto
+            </button>
+          )}
           {actionable ? (
             <button
               onClick={() => onAction(card)}
