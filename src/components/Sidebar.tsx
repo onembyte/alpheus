@@ -10,6 +10,8 @@ interface Props {
   tierTotals: Record<Tier, number>;
   filter: TierFilter;
   onFilter: (f: TierFilter) => void;
+  volumeActive: boolean;
+  onSelectVolume: () => void;
   settingsActive: boolean;
   onOpenSettings: () => void;
 }
@@ -60,8 +62,18 @@ export default function Sidebar(p: Props) {
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 pb-3.5">
         <div className="section-label px-2.5 pb-2 pt-3">This Mac</div>
 
-        <div className="flex items-center gap-2.5 rounded-[11px] px-2.5 py-2">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flex: "none" }}>
+        <button
+          onClick={p.onSelectVolume}
+          className="btn-focus flex items-center gap-2.5 rounded-[11px] px-2.5 py-2 text-left transition-colors hover:bg-(--track)"
+          style={selected(p.volumeActive)}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 18 18"
+            fill="none"
+            style={{ flex: "none", color: "var(--txt)" }}
+          >
             <rect
               x="1.6"
               y="4.4"
@@ -90,7 +102,7 @@ export default function Sidebar(p: Props) {
             style={{ background: status.color, boxShadow: `0 0 8px ${status.color}` }}
             title={status.label}
           />
-        </div>
+        </button>
 
         <div className="section-label px-2.5 pb-2 pt-4">Categories</div>
 

@@ -111,6 +111,11 @@ export default function App() {
             setFilter(f);
             setView("reclaim");
           }}
+          volumeActive={view === "reclaim"}
+          onSelectVolume={() => {
+            setFilter("all");
+            setView("reclaim");
+          }}
           settingsActive={view === "settings"}
           onOpenSettings={() => setView("settings")}
         />
