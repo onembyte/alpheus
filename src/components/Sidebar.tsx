@@ -10,22 +10,27 @@ interface Props {
   tierTotals: Record<Tier, number>;
   filter: TierFilter;
   onFilter: (f: TierFilter) => void;
+  /** Low-space warning threshold in GB (Settings → notify_below_gb). */
+  warnBelowGb: number;
   volumeActive: boolean;
   onSelectVolume: () => void;
   settingsActive: boolean;
   onOpenSettings: () => void;
 }
 
-function freeStatus(usage: DiskUsage | null): { color: string; label: string; pulse: boolean } {
+function freeStatus(
+  usage: DiskUsage | null,
+  warnBelowGb: number,
+): { color: string; label: string; pulse: boolean } {
   if (!usage) return { color: "var(--txt3)", label: "measuring", pulse: false };
   const gb = usage.free_kb / 1048576;
-  if (gb < 10) return { color: "var(--danger)", label: "critically low", pulse: true };
-  if (gb < 15) return { color: "var(--warn)", label: "low", pulse: true };
+  if (gb < warnBelowGb * 0.66) return { color: "var(--danger)", label: "critically low", pulse: true };
+  if (gb < warnBelowGb) return { color: "var(--warn)", label: "low", pulse: true };
   return { color: "var(--good)", label: "healthy", pulse: false };
 }
 
 export default function Sidebar(p: Props) {
-  const status = freeStatus(p.usage);
+  const status = freeStatus(p.usage, p.warnBelowGb);
   const selected = (active: boolean) =>
     active
       ? { background: "var(--sel)", boxShadow: "inset 0 1px 0 var(--edge-hi), 0 0 0 1px var(--sel-edge)" }

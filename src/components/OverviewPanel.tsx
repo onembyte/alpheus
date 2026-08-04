@@ -5,6 +5,8 @@ import { fmtKB } from "../format";
 interface Props {
   usage: DiskUsage;
   cards: Card[];
+  /** Low-space warning threshold in GB (Settings → notify_below_gb). */
+  warnBelowGb: number;
   onFreeUp: () => void;
 }
 
@@ -39,8 +41,9 @@ export function buildSeries(usage: DiskUsage, cards: Card[]): { segs: Seg[]; res
 
 const RING_C = 628.3; // 2π · r100
 
-export default function OverviewPanel({ usage, cards, onFreeUp }: Props) {
+export default function OverviewPanel({ usage, cards, warnBelowGb, onFreeUp }: Props) {
   const freeGb = usage.free_kb / 1048576;
+  const criticalGb = warnBelowGb * 0.66;
   const freePct = usage.total_kb > 0 ? (usage.free_kb / usage.total_kb) * 100 : 0;
   const { segs } = buildSeries(usage, cards);
   const reclaimable = cards
@@ -50,9 +53,10 @@ export default function OverviewPanel({ usage, cards, onFreeUp }: Props) {
     .filter((c) => c.tier === "safe" && c.action !== "explain")
     .reduce((s, c) => s + c.size_kb, 0);
 
-  const low = freeGb < 15;
-  const bannerColor = freeGb < 10 ? "var(--danger)" : "var(--warn)";
-  const statusColor = freeGb < 10 ? "var(--danger)" : freeGb < 15 ? "var(--warn)" : "var(--good)";
+  const low = freeGb < warnBelowGb;
+  const bannerColor = freeGb < criticalGb ? "var(--danger)" : "var(--warn)";
+  const statusColor =
+    freeGb < criticalGb ? "var(--danger)" : freeGb < warnBelowGb ? "var(--warn)" : "var(--good)";
 
   let acc = 0;
   const ringSegs = segs.map((s) => {

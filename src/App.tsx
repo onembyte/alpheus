@@ -116,6 +116,7 @@ export default function App() {
         <Sidebar
           usage={s.usage}
           tierTotals={tierTotals}
+          warnBelowGb={settings?.notify_below_gb ?? 15}
           filter={filter}
           onFilter={(f) => {
             setFilter(f);
@@ -189,6 +190,7 @@ export default function App() {
                   <OverviewPanel
                     usage={s.usage}
                     cards={s.cards}
+                    warnBelowGb={settings?.notify_below_gb ?? 15}
                     onFreeUp={() => setFilter("safe")}
                   />
                 )}
