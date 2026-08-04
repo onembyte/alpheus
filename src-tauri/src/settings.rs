@@ -20,6 +20,9 @@ pub struct AppSettings {
     /// schedules survive app restarts and sleep instead of resetting.
     #[serde(default)]
     pub last_auto_scan_ts: u64,
+    /// Hide the Dock icon and live in the menu bar only.
+    #[serde(default)]
+    pub menu_bar_only: bool,
 }
 
 impl Default for AppSettings {
@@ -30,6 +33,7 @@ impl Default for AppSettings {
             auto_clean: false,
             auto_clean_ids: vec![],
             last_auto_scan_ts: 0,
+            menu_bar_only: false,
         }
     }
 }

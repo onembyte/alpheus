@@ -102,9 +102,27 @@ fn set_settings(
 ) -> Result<(), String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     settings::save(&dir, &new_settings);
+    apply_activation_policy(&app, new_settings.menu_bar_only);
     *state.0.lock().unwrap() = new_settings;
     update_tray(&app); // threshold may have changed the ⚠️ state
     Ok(())
+}
+
+/// Menu-bar-only mode: Accessory hides the Dock icon; the window and tray
+/// keep working. No-op off macOS.
+fn apply_activation_policy(app: &AppHandle, menu_bar_only: bool) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app.set_activation_policy(if menu_bar_only {
+            tauri::ActivationPolicy::Accessory
+        } else {
+            tauri::ActivationPolicy::Regular
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, menu_bar_only);
+    }
 }
 
 fn now_secs() -> u64 {
@@ -154,6 +172,10 @@ fn notify(body: &str) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .manage(ScanState::default())
         .invoke_handler(tauri::generate_handler![
             disk_usage,
@@ -171,6 +193,7 @@ pub fn run() {
                 .map(|d| settings::load(&d))
                 .unwrap_or_default();
             let initial_threshold = initial.notify_below_gb;
+            apply_activation_policy(app.handle(), initial.menu_bar_only);
             app.manage(SettingsState(Mutex::new(initial)));
 
             let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?;

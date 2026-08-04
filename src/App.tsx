@@ -12,6 +12,7 @@ import CardRow from "./components/CardRow";
 import Sheet from "./components/Sheet";
 import HistoryPanel from "./components/HistoryPanel";
 import SettingsPanel from "./components/SettingsPanel";
+import { cardMatches, isEmptyQuery, parseQuery } from "./search";
 import { fmtKB } from "./format";
 
 function ScanningState() {
@@ -58,6 +59,9 @@ export default function App() {
   const { mode, setMode } = useTheme();
   const [view, setView] = useState<View>("reclaim");
   const [filter, setFilter] = useState<TierFilter>("all");
+  const [query, setQuery] = useState("");
+  const parsedQuery = useMemo(() => parseQuery(query), [query]);
+  const searching = !isEmptyQuery(parsedQuery);
 
   const toggleAuto = (id: string) => {
     if (!settings) return;
@@ -139,6 +143,8 @@ export default function App() {
             onRescan={s.rescan}
             reclaimableKb={tierTotals.safe + tierTotals["with-care"]}
             historyCount={s.history.length}
+            query={query}
+            onQuery={setQuery}
           />
 
           <main className="min-h-0 grow overflow-y-auto p-5">
@@ -186,7 +192,7 @@ export default function App() {
               <div
                 className={`flex flex-col gap-4 ${s.scanning ? "pointer-events-none opacity-60" : ""}`}
               >
-                {s.usage && s.cards && filter === "all" && (
+                {s.usage && s.cards && filter === "all" && !searching && (
                   <OverviewPanel
                     usage={s.usage}
                     cards={s.cards}
@@ -195,21 +201,27 @@ export default function App() {
                   />
                 )}
 
-                {filter !== "all" &&
-                  (s.cards ?? []).filter((c) => c.tier === filter).length === 0 && (
-                    <div className="glass-card fade-up px-[18px] py-12 text-center">
-                      <div className="text-[13px]" style={{ color: "var(--txt2)" }}>
-                        Nothing in this tier right now.
-                      </div>
-                      <div className="mono mt-1 text-[10.5px]" style={{ color: "var(--txt3)" }}>
-                        rescan or pick another category on the left
-                      </div>
+                {(s.cards ?? []).filter(
+                  (c) =>
+                    (filter === "all" || c.tier === filter) && cardMatches(c, parsedQuery),
+                ).length === 0 && (
+                  <div className="glass-card fade-up px-[18px] py-12 text-center">
+                    <div className="text-[13px]" style={{ color: "var(--txt2)" }}>
+                      {searching ? "Nothing matches that filter." : "Nothing in this tier right now."}
                     </div>
-                  )}
+                    <div className="mono mt-1 text-[10.5px]" style={{ color: "var(--txt3)" }}>
+                      {searching
+                        ? "try size:>500MB, tier:safe, or plain text — Esc clears"
+                        : "rescan or pick another category on the left"}
+                    </div>
+                  </div>
+                )}
 
                 {visibleTiers.map((tier) => {
                   const meta = TIER_META[tier];
-                  const group = (s.cards ?? []).filter((c) => c.tier === tier);
+                  const group = (s.cards ?? []).filter(
+                    (c) => c.tier === tier && cardMatches(c, parsedQuery),
+                  );
                   if (group.length === 0) return null;
                   const groupTotal = group
                     .filter((c) => c.action !== "explain")

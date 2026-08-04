@@ -9,6 +9,8 @@ interface Props {
   onRescan: () => void;
   reclaimableKb: number;
   historyCount: number;
+  query: string;
+  onQuery: (q: string) => void;
 }
 
 const TABS: { key: View; label: string }[] = [
@@ -63,6 +65,40 @@ export default function TopBar(p: Props) {
       </div>
 
       <div data-tauri-drag-region className="grow" />
+
+      {p.view === "reclaim" && (
+        <div
+          className="flex h-[30px] min-w-[186px] items-center gap-[7px] rounded-[9px] px-[11px]"
+          style={{ background: "var(--track)", boxShadow: "inset 0 1px 2px rgba(0,0,0,.12)" }}
+        >
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ opacity: 0.45 }}>
+            <circle cx="6" cy="6" r="4.2" stroke="currentColor" strokeWidth="1.4" />
+            <path d="M9.2 9.2 12.4 12.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+          <input
+            value={p.query}
+            onChange={(e) => p.onQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") p.onQuery("");
+            }}
+            placeholder="filter · size:>1GB · tier:safe"
+            spellCheck={false}
+            aria-label="Filter categories"
+            className="mono selectable w-[168px] bg-transparent text-[12px] outline-none"
+            style={{ color: "var(--txt)", border: "none" }}
+          />
+          {p.query && (
+            <button
+              onClick={() => p.onQuery("")}
+              aria-label="Clear filter"
+              className="btn-focus flex-none text-[11px] font-semibold"
+              style={{ color: "var(--txt3)" }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
 
       <button
         onClick={p.onRescan}

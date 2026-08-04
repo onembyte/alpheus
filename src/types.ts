@@ -52,4 +52,5 @@ export interface AppSettings {
   auto_clean: boolean;
   auto_clean_ids: string[];
   last_auto_scan_ts: number;
+  menu_bar_only: boolean;
 }

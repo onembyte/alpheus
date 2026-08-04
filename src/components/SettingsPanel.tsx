@@ -1,6 +1,53 @@
+import { useEffect, useState } from "react";
+import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import type { ThemeMode } from "../hooks/useTheme";
 import type { AppSettings } from "../types";
 import LogoMark from "./LogoMark";
+
+/** On/Off pill pair used by the boolean rows. */
+function TogglePair({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: boolean;
+  disabled?: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex gap-2">
+      {[
+        { label: "Off", v: false },
+        { label: "On", v: true },
+      ].map((o) => {
+        const active = value === o.v;
+        return (
+          <button
+            key={o.label}
+            disabled={disabled}
+            onClick={() => onChange(o.v)}
+            className="btn-focus rounded-[11px] px-5 py-2 text-[12px] font-semibold transition-all hover:bg-(--track) disabled:opacity-50"
+            style={
+              active
+                ? {
+                    color: "var(--txt)",
+                    background: "var(--sel)",
+                    boxShadow: "inset 0 1px 0 var(--edge-hi), 0 0 0 1px var(--sel-edge)",
+                  }
+                : {
+                    color: "var(--txt2)",
+                    background: "var(--panel)",
+                    boxShadow: "0 0 0 1px var(--panel-edge)",
+                  }
+            }
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 interface Props {
   mode: ThemeMode;
@@ -64,8 +111,60 @@ const OPTIONS: { key: ThemeMode; label: string; sub: string; icon: React.ReactNo
 ];
 
 export default function SettingsPanel({ mode, onMode, settings, update }: Props) {
+  const [loginItem, setLoginItem] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    isEnabled()
+      .then(setLoginItem)
+      .catch(() => setLoginItem(false));
+  }, []);
+
+  const toggleLoginItem = async (v: boolean) => {
+    try {
+      if (v) await enable();
+      else await disable();
+      setLoginItem(v);
+    } catch {
+      setLoginItem(await isEnabled().catch(() => false));
+    }
+  };
+
   return (
     <div className="fade-up mx-auto flex w-full max-w-[620px] flex-col gap-4">
+      <div className="glass-card px-[18px] pb-[18px] pt-4">
+        <div className="section-label mb-3">General</div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-[12.5px] font-medium" style={{ color: "var(--txt)" }}>
+              Launch at login
+            </div>
+            <div className="text-[11px]" style={{ color: "var(--txt3)" }}>
+              Start Alpheus when you log in, so scheduled scans always run.
+            </div>
+          </div>
+          <TogglePair
+            value={loginItem ?? false}
+            disabled={loginItem === null}
+            onChange={toggleLoginItem}
+          />
+        </div>
+        <div className="mt-3.5 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-[12.5px] font-medium" style={{ color: "var(--txt)" }}>
+              Menu bar only
+            </div>
+            <div className="text-[11px]" style={{ color: "var(--txt3)" }}>
+              Hide the Dock icon — the window stays reachable from the menu-bar number.
+            </div>
+          </div>
+          <TogglePair
+            value={settings?.menu_bar_only ?? false}
+            disabled={!settings}
+            onChange={(v) => update({ menu_bar_only: v })}
+          />
+        </div>
+      </div>
+
       <div className="glass-card px-[18px] pb-[18px] pt-4">
         <div className="section-label mb-1">Appearance</div>
         <div className="mb-3.5 text-[11.5px]" style={{ color: "var(--txt3)" }}>
