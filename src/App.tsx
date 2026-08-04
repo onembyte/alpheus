@@ -132,6 +132,13 @@ export default function App() {
               the first run can take up to a minute
             </div>
           </div>
+        ) : cards && cards.length === 0 ? (
+          <div className="py-16 text-center text-sm text-neutral-500">
+            Nothing left to reclaim — the disk is clean.
+            <div className="mt-1 text-[12px] text-neutral-600">
+              Rescan anytime; caches grow back on their own.
+            </div>
+          </div>
         ) : (
           SECTIONS.map(({ tier, heading, sub }) => {
             const group = cards?.filter((c) => c.tier === tier) ?? [];
