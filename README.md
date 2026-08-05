@@ -25,7 +25,7 @@
     <img src="docs/download-button.svg" width="400" alt="Download Alpheus — macOS · Apple Silicon · .dmg" />
   </a>
   <br />
-  <sub>Unsigned build — right-click → Open on first launch.</sub>
+  <sub>Not yet notarized — after dragging to Applications, run the one-line command in <a href="#install">Install</a>.</sub>
 </p>
 
 <p align="center">
@@ -37,6 +37,35 @@
   <img src="docs/design/inspector-actions.png" width="130" alt="Snapshots and quick actions" />
 </p>
 <p align="center"><sub>The Alpheus design system — liquid glass, designed in Claude Design.</sub></p>
+
+## Install
+
+Download the DMG above, drag **Alpheus** to Applications, then run this once:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Alpheus.app
+```
+
+Then open it normally.
+
+<details>
+<summary><b>Why is that needed — and is it safe?</b></summary>
+
+macOS tags everything a browser downloads with a `com.apple.quarantine`
+attribute. Apps that aren't **notarized** by Apple are refused with a scary
+message — often *"Alpheus is damaged and can't be opened"*, which is
+misleading: nothing is damaged, and right-click → Open does **not** get past
+it. The command above removes the download tag, which is the same decision
+you make when you click through any "open anyway" dialog.
+
+Notarization requires a paid Apple Developer account; it's on the roadmap.
+Until then you're trusting this repo — the builds are ad-hoc signed and
+reproducible from source with `pnpm tauri build`, and everything the app can
+delete is listed in the [safety model](#safety-model). If you'd rather not
+run a downloaded binary, build it yourself: the [Getting started](#getting-started)
+steps produce the same app.
+
+</details>
 
 ## Why
 
