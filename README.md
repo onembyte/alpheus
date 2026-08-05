@@ -22,7 +22,7 @@
 
 <p align="center">
   <a href="https://github.com/onembyte/alpheus/releases/latest/download/Alpheus-macOS.dmg">
-    <img src="docs/download-button.svg" width="400" alt="Download Alpheus — macOS · Apple Silicon · .dmg" />
+    <img src="docs/download-button.svg" width="400" alt="Download Alpheus — macOS universal, Apple Silicon and Intel" />
   </a>
   <br />
   <sub>Not yet notarized — after dragging to Applications, run the one-line command in <a href="#install">Install</a>.</sub>
@@ -40,7 +40,9 @@
 
 ## Install
 
-Download the DMG above, drag **Alpheus** to Applications, then run this once:
+One universal build runs natively on both Apple Silicon and Intel Macs —
+there's nothing to choose. Download the DMG above, drag **Alpheus** to
+Applications, then run this once:
 
 ```bash
 xattr -d com.apple.quarantine /Applications/Alpheus.app

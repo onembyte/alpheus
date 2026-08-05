@@ -28,7 +28,7 @@
 
   <!-- label -->
   <text x="118" y="44" font-family="-apple-system,'SF Pro Display','Segoe UI',system-ui,sans-serif" font-size="26" font-weight="700" fill="#FFFFFF">Download Alpheus</text>
-  <text x="118" y="70" font-family="ui-monospace,'SF Mono',Menlo,monospace" font-size="14" font-weight="500" fill="#FFFFFF" fill-opacity="0.82">macOS · Apple Silicon · .dmg</text>
+  <text x="118" y="70" font-family="ui-monospace,'SF Mono',Menlo,monospace" font-size="14" font-weight="500" fill="#FFFFFF" fill-opacity="0.82">macOS universal · Apple Silicon + Intel</text>
 
   <!-- download glyph -->
   <circle cx="582" cy="48" r="23" fill="#FFFFFF" fill-opacity="0.17"/>
