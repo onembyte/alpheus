@@ -43,10 +43,11 @@
 Download the DMG above, drag **Alpheus** to Applications, then run this once:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/Alpheus.app
+xattr -d com.apple.quarantine /Applications/Alpheus.app
 ```
 
-Then open it normally.
+Then open it normally. (If it replies `No such xattr`, the tag was already
+gone — just open the app.)
 
 <details>
 <summary><b>Why is that needed — and is it safe?</b></summary>
@@ -57,6 +58,10 @@ message — often *"Alpheus is damaged and can't be opened"*, which is
 misleading: nothing is damaged, and right-click → Open does **not** get past
 it. The command above removes the download tag, which is the same decision
 you make when you click through any "open anyway" dialog.
+
+Note the command is `-d`, not `-dr`: older macOS versions ship an `xattr`
+without the recursive `-r` flag, and clearing the tag on the bundle itself is
+what Gatekeeper checks anyway.
 
 Notarization requires a paid Apple Developer account; it's on the roadmap.
 Until then you're trusting this repo — the builds are ad-hoc signed and
