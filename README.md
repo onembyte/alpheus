@@ -7,13 +7,13 @@
 <p align="center">
   The storage manager and cleanup engine for macOS and Linux (Omarchy / Arch). Honest, drillable, and safe.
   <br />
+  <a href="#-quick-install">Quick Install</a> ·
   <a href="#why">Why</a> ·
   <a href="#features">Features</a> ·
   <a href="#cli-reference">CLI Reference</a> ·
-  <a href="#installation">Installation</a> ·
-  <a href="#omarchy-widget">Omarchy Top Bar Widget</a> ·
-  <a href="#safety-model">Safety model</a> ·
-  <a href="#architecture">Architecture</a>
+  <a href="#installation-by-platform">Manual Build</a> ·
+  <a href="#omarchy-top-bar-widget">Omarchy Widget</a> ·
+  <a href="#safety-model">Safety Model</a>
 </p>
 
 <p align="center">
@@ -24,12 +24,27 @@
 
 ---
 
+## ⚡ Quick Install
+
+Install the Alpheus CLI, interactive TUI, shell completions, and Omarchy desktop widget with a single command on **Linux (Omarchy / Arch)** and **macOS**:
+
+```bash
+curl -fsSL https://onembyte.github.io/alpheus/install.sh | bash
+```
+
+> *(Fallback via raw GitHub)*:
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/onembyte/alpheus/main/scripts/install.sh | bash
+> ```
+
+---
+
 ## Why
 
 Every developer workstation slowly fills up with gigabytes of dead weight: forgotten Docker VM disks, dozens of `node_modules`, compiled Cargo `target/` directories, Pacman package caches, Xcode DerivedData, stale coredumps, and browser caches.
 
 Finding and cleaning them usually means running messy, unsafe `du` and `find -delete` commands. **Alpheus** turns that into a unified, safe, one-glance tool with three interfaces:
-1. **Interactive Terminal CLI & TUI (`alpheus`)** for terminal workflows on Linux & macOS.
+1. **Interactive Terminal CLI & TUI (`alpheus`)** for keyboard-driven terminal workflows.
 2. **Omarchy Top Bar Quickshell Widget** for instant live stats and one-click cleanup on Arch / Omarchy OS.
 3. **Liquid Glass Desktop GUI (`alpheus-app`)** on macOS and Linux desktop environments.
 
@@ -59,96 +74,6 @@ Finding and cleaning them usually means running messy, unsafe `du` and `find -de
 
 ---
 
-## Quick Installation
-
-Install the Alpheus CLI and shell completions with a single command:
-
-```bash
-curl -fsSL https://onembyte.github.io/alpheus/install.sh | bash
-```
-
-*(Or via raw GitHub link)*:
-```bash
-curl -fsSL https://raw.githubusercontent.com/onembyte/alpheus/main/scripts/install.sh | bash
-```
-
----
-
-## Installation by Platform
-
-### Linux (Omarchy OS / Arch Linux)
-
-#### 1. From Source / Cargo:
-
-```bash
-# Clone repository
-git clone https://github.com/onembyte/alpheus.git
-cd alpheus/src-tauri
-
-# Build optimized release binary and install to ~/.local/bin
-cargo build --release --bin alpheus
-cp target/release/alpheus ~/.local/bin/alpheus
-
-# Verify installation
-alpheus scan
-```
-
-#### 2. Install the Omarchy Top Bar Quickshell Widget:
-
-```bash
-# Create plugin directory
-mkdir -p ~/.config/omarchy/plugins/omarchy.alpheus
-
-# Link or copy the widget
-cp -r ~/.config/omarchy/plugins/omarchy.alpheus/* ~/.config/omarchy/plugins/omarchy.alpheus/ 2>/dev/null || true
-```
-
-Add `"omarchy.alpheus"` to `~/.config/omarchy/shell.json` in your plugins and bar layout:
-
-```json
-{
-  "bar": {
-    "layout": {
-      "right": [
-        { "id": "omarchy.power" },
-        { "id": "omarchy.alpheus" }
-      ]
-    }
-  },
-  "plugins": [
-    "omarchy.alpheus"
-  ]
-}
-```
-
-#### 3. Enable Automated Weekly Background Cleaning (Optional):
-
-```bash
-alpheus schedule enable
-```
-
----
-
-### macOS
-
-#### 1. Desktop App Installation:
-
-Download the latest `Alpheus-macOS.dmg`, drag **Alpheus** to Applications, then remove the quarantine attribute:
-
-```bash
-xattr -d com.apple.quarantine /Applications/Alpheus.app
-```
-
-#### 2. Standalone CLI:
-
-```bash
-cd alpheus/src-tauri
-cargo build --release --bin alpheus
-cp target/release/alpheus /usr/local/bin/alpheus
-```
-
----
-
 ## CLI Reference
 
 ### `alpheus scan`
@@ -170,23 +95,29 @@ Launches the full interactive terminal menu with keyboard navigation:
 alpheus -i
 ```
 
-### `alpheus status --json`
-Outputs a complete JSON summary including disk space, tier breakdown, and list of cards (used by the Omarchy top bar widget and custom scripts):
+### `alpheus browse [dir]` (Directory Tree Explorer)
+Interactive ncdu-style folder tree navigator to drill into subdirectories, inspect space hogs, and trash unwanted items:
 ```bash
-alpheus status --json
+alpheus browse ~
 ```
 
-### `alpheus dry-run <category-id>`
-Previews the exact paths, per-path byte sizes, execution method, and safety warnings for a category:
+### `alpheus top [dir]` (Space Hogs)
+Finds the largest space consumers in any folder with visual proportional bars:
 ```bash
-alpheus dry-run cargo-target
-alpheus dry-run pacman-cache
+alpheus top ~
 ```
 
-### `alpheus clean <category-id> [-y]`
-Cleans a specific category with confirmation prompt (or pass `-y` to proceed immediately):
+### `alpheus dupes [dir]` (Duplicate Finder)
+Fast multi-stage SHA-256 duplicate file detector:
 ```bash
-alpheus clean cargo-target -y
+alpheus dupes ~/Downloads
+```
+
+### `alpheus snapshot [dir]` & `alpheus diff [dir]` (Growth Tracker)
+Takes a baseline size snapshot and tracks what grew or shrank on disk over time:
+```bash
+alpheus snapshot ~
+alpheus diff ~
 ```
 
 ### `alpheus clean --all-safe [-y]`
@@ -202,10 +133,82 @@ alpheus schedule enable
 alpheus schedule status
 ```
 
-### `alpheus history`
-Shows the historical log of all cleanup actions and total disk space freed:
+### `alpheus update`
+Updates the Alpheus binary in-place to the latest release:
 ```bash
-alpheus history
+alpheus update
+```
+
+---
+
+## Installation by Platform
+
+### Linux (Omarchy OS / Arch Linux)
+
+#### 1. Quick One-Liner (Recommended):
+
+```bash
+curl -fsSL https://onembyte.github.io/alpheus/install.sh | bash
+```
+
+#### 2. From Source / Cargo:
+
+```bash
+# Clone repository
+git clone https://github.com/onembyte/alpheus.git
+cd alpheus/src-tauri
+
+# Build optimized release binary and install to ~/.local/bin
+cargo build --release --bin alpheus
+install -m755 target/release/alpheus ~/.local/bin/alpheus
+
+# Verify installation
+alpheus scan
+```
+
+#### 3. Omarchy Top Bar Quickshell Widget:
+
+The installer deploys the widget automatically. To configure manually:
+
+```bash
+mkdir -p ~/.config/omarchy/plugins/omarchy.alpheus
+cp -r plugins/omarchy.alpheus/* ~/.config/omarchy/plugins/omarchy.alpheus/
+```
+
+Add `"omarchy.alpheus"` to `~/.config/omarchy/shell.json` in your plugins and bar layout:
+
+```json
+{
+  "bar": {
+    "layout": {
+      "right": [
+        { "id": "omarchy.power" },
+        { "id": "omarchy.alpheus" }
+      ]
+    }
+  },
+  "plugins": [
+    "omarchy.alpheus"
+  ]
+}
+```
+
+---
+
+### macOS
+
+#### 1. Quick CLI Install:
+
+```bash
+curl -fsSL https://onembyte.github.io/alpheus/install.sh | bash
+```
+
+#### 2. Desktop App:
+
+Download the latest `Alpheus-macOS.dmg`, drag **Alpheus** to Applications, then remove the quarantine attribute:
+
+```bash
+xattr -d com.apple.quarantine /Applications/Alpheus.app
 ```
 
 ---
@@ -230,14 +233,22 @@ alpheus history
 │   ├── src/bin/alpheus.rs  # Standalone CLI & Interactive TUI binary
 │   ├── src/scan.rs         # Parallel multi-platform scanners & git proofs
 │   ├── src/exec.rs         # Safety rules & execution engine
+│   ├── src/browse.rs       # Interactive directory tree explorer
+│   ├── src/analyze.rs      # Directory size analyzer & space hogs
+│   ├── src/dupes.rs        # SHA-256 duplicate file detector
+│   ├── src/snapshot.rs     # Snapshot baseline & growth diff engine
+│   ├── src/rules.rs        # User custom rules (~/.config/alpheus/rules.json)
 │   ├── src/disk.rs         # POSIX disk usage parser
 │   ├── src/history.rs      # JSON action log
 │   ├── src/google.rs       # Google Drive BYOK integration
 │   └── src/lib.rs          # Core library & Tauri bindings
-└── ~/.config/omarchy/plugins/omarchy.alpheus/ # Omarchy Quickshell Widget
-    ├── manifest.json       # Omarchy plugin manifest
-    ├── BarWidget.qml       # Top bar disk indicator
-    └── Panel.qml           # Popout dropdown panel
+├── plugins/omarchy.alpheus/ # Omarchy Quickshell Widget
+│   ├── manifest.json       # Omarchy plugin manifest
+│   ├── BarWidget.qml       # Top bar disk indicator
+│   └── Panel.qml           # Popout dropdown panel
+└── docs/
+    ├── index.html          # GitHub Pages landing page
+    └── install.sh          # Hosted installer endpoint
 ```
 
 ---
