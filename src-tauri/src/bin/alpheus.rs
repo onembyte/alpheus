@@ -1,6 +1,7 @@
-//! Standalone Alpheus CLI, Interactive TUI, Analytics, Dupes & Growth Diff.
+//! Standalone Alpheus CLI, Interactive TUI, Analytics, Explorer, Dupes & Watcher.
 
 use alpheus_lib::analyze;
+use alpheus_lib::browse;
 use alpheus_lib::disk;
 use alpheus_lib::dupes;
 use alpheus_lib::exec;
@@ -21,6 +22,8 @@ use std::fs;
 use std::io::{self, stdout, Write};
 use std::path::Path;
 use std::process::Command;
+use std::thread;
+use std::time::Duration;
 
 fn print_help() {
     println!("Alpheus CLI — Storage Manager & Cleanup Engine (Linux / Omarchy & macOS)");
@@ -31,17 +34,20 @@ fn print_help() {
     println!("CORE COMMANDS:");
     println!("  scan              Scan disk and display reclaimable categories (default)");
     println!("  interactive, -i   Launch the interactive terminal TUI menu");
+    println!("  browse [dir]      Interactive ncdu-style directory tree explorer");
     println!("  clean <id> [-y]   Reclaim a specific category with confirmation");
     println!("  clean --all-safe  Reclaim all safe-tier categories automatically");
     println!("  dry-run <id>      Preview exact paths and bytes to be reclaimed for a card");
     println!("  status [--json]   Show disk summary, free space, and JSON breakdown");
     println!();
-    println!("ANALYTICS & TOOLS:");
+    println!("ANALYTICS & AUTOMATION:");
     println!("  top [dir]         Find top 20 largest directories and files (default: $HOME)");
     println!("  dupes [dir]       Find duplicate files with multi-stage SHA-256 matching");
     println!("  snapshot [dir]    Take a disk usage snapshot baseline");
     println!("  diff [dir]        Compare live disk usage against the last snapshot");
+    println!("  watch [--pct N]   Monitor disk space and notify when free space drops below N%");
     println!("  schedule          Manage background automatic cleanup timers (systemd / launchd)");
+    println!("  update            Update Alpheus CLI binary to the latest version");
     println!("  completion <sh>   Generate shell auto-completions (bash, zsh, fish)");
     println!("  history           Display the log of previous cleanup actions");
     println!("  help, -h, --help  Print this help message");
@@ -49,11 +55,12 @@ fn print_help() {
     println!("EXAMPLES:");
     println!("  alpheus                   # Quick overview scan");
     println!("  alpheus -i                # Interactive keyboard-driven cleanup");
+    println!("  alpheus browse ~          # Interactive folder tree navigator");
     println!("  alpheus top ~             # View largest space hogs in home folder");
     println!("  alpheus dupes ~/Downloads # Find duplicate files in Downloads");
     println!("  alpheus diff ~            # Track disk growth since last snapshot");
     println!("  alpheus clean --all-safe  # Safely wipe build caches and packages");
-    println!("  alpheus schedule enable   # Enable weekly automatic safe cleanup");
+    println!("  alpheus update            # Update Alpheus to latest release");
 }
 
 fn fmt_kb(kb: u64) -> String {
@@ -549,6 +556,85 @@ fn run_diff(target_str: Option<&str>) {
     }
 }
 
+// ---------------------------------------------------------------- Disk Watcher & Notifications
+
+fn run_watch(threshold_pct: f64) {
+    println!(
+        "\x1b[1mAlpheus Disk Watcher active:\x1b[0m Monitoring free space (Alert threshold: < {:.0}% free)",
+        threshold_pct
+    );
+    println!("Running background check every 60 seconds. Press Ctrl+C to stop.");
+
+    let mut last_alert_secs = 0u64;
+
+    loop {
+        let usage = disk::usage();
+        let free_pct = if usage.total_kb > 0 {
+            (usage.free_kb as f64 / usage.total_kb as f64) * 100.0
+        } else {
+            100.0
+        };
+
+        if free_pct < threshold_pct {
+            let now = now_secs();
+            // Alert at most once every 10 minutes
+            if now - last_alert_secs >= 600 {
+                last_alert_secs = now;
+                let title = "Alpheus: Low Disk Space Warning";
+                let msg = format!(
+                    "Only {} ({:.1}%) free space remaining on disk. Run 'alpheus' to clean.",
+                    fmt_kb(usage.free_kb),
+                    free_pct
+                );
+
+                #[cfg(target_os = "linux")]
+                {
+                    let _ = Command::new("notify-send")
+                        .args(["-u", "critical", "-i", "alpheus", title, &msg])
+                        .output();
+                }
+
+                #[cfg(target_os = "macos")]
+                {
+                    let script = format!(
+                        "display notification \"{}\" with title \"{}\"",
+                        msg, title
+                    );
+                    let _ = Command::new("osascript")
+                        .args(["-e", &script])
+                        .output();
+                }
+
+                println!("\x1b[31m[ALERT] {}\x1b[0m", msg);
+            }
+        }
+
+        thread::sleep(Duration::from_secs(60));
+    }
+}
+
+// ---------------------------------------------------------------- Auto-Updater
+
+fn run_update() {
+    println!("\x1b[1mChecking for Alpheus updates from GitHub...\x1b[0m");
+    let status = Command::new("bash")
+        .args([
+            "-c",
+            "curl -fsSL https://onembyte.github.io/alpheus/install.sh | bash",
+        ])
+        .status();
+
+    match status {
+        Ok(s) if s.success() => {
+            println!("\x1b[32m✔ Alpheus updated successfully!\x1b[0m");
+        }
+        _ => {
+            eprintln!("\x1b[31mUpdate failed. You can also run:\x1b[0m");
+            eprintln!("  curl -fsSL https://raw.githubusercontent.com/onembyte/alpheus/main/scripts/install.sh | bash");
+        }
+    }
+}
+
 // ---------------------------------------------------------------- Shell Completions
 
 fn run_completion(shell: &str) {
@@ -561,7 +647,7 @@ fn run_completion(shell: &str) {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    opts="scan interactive status dry-run clean schedule history top dupes snapshot diff help"
+    opts="scan interactive browse status dry-run clean schedule history top dupes snapshot diff watch update help"
 
     case "$prev" in
         clean|dry-run)
@@ -597,6 +683,7 @@ _alpheus() {
     commands=(
         'scan:Scan disk for reclaimable items'
         'interactive:Interactive keyboard cleanup menu'
+        'browse:Interactive directory tree explorer'
         'clean:Reclaim a specific category or all safe items'
         'dry-run:Preview exact paths and bytes'
         'status:Show disk usage summary'
@@ -604,7 +691,9 @@ _alpheus() {
         'dupes:Find duplicate files'
         'snapshot:Save disk snapshot'
         'diff:Compare growth against snapshot'
+        'watch:Low-disk space alert daemon'
         'schedule:Manage automatic background timer'
+        'update:Self-update Alpheus'
         'history:View action log'
         'completion:Generate shell completions'
     )
@@ -620,6 +709,7 @@ _alpheus "$@"
                 "{}",
                 r#"complete -c alpheus -f -a "scan" -d "Scan disk for reclaimable items"
 complete -c alpheus -f -a "interactive" -d "Interactive keyboard cleanup menu"
+complete -c alpheus -f -a "browse" -d "Interactive directory tree explorer"
 complete -c alpheus -f -a "clean" -d "Reclaim a specific category or --all-safe"
 complete -c alpheus -f -a "dry-run" -d "Preview exact paths and bytes"
 complete -c alpheus -f -a "status" -d "Show disk usage summary"
@@ -627,7 +717,9 @@ complete -c alpheus -f -a "top" -d "Analyze largest space consumers"
 complete -c alpheus -f -a "dupes" -d "Find duplicate files"
 complete -c alpheus -f -a "snapshot" -d "Save disk snapshot"
 complete -c alpheus -f -a "diff" -d "Compare growth against snapshot"
+complete -c alpheus -f -a "watch" -d "Low-disk space alert daemon"
 complete -c alpheus -f -a "schedule" -d "Manage automatic background timer"
+complete -c alpheus -f -a "update" -d "Self-update Alpheus"
 complete -c alpheus -f -a "history" -d "View action log"
 "#
             );
@@ -1036,6 +1128,13 @@ fn main() {
                 let _ = run_interactive_tui(&cards, &usage);
                 return;
             }
+            "browse" => {
+                let target = args.get(2).map(Path::new);
+                let default_path = scan::home();
+                let dir = target.unwrap_or(&default_path);
+                let _ = browse::run_interactive_browser(dir);
+                return;
+            }
             "top" | "analyze" => {
                 let target = args.get(2).map(|s| s.as_str());
                 run_top(target, 20);
@@ -1054,6 +1153,20 @@ fn main() {
             "diff" => {
                 let target = args.get(2).map(|s| s.as_str());
                 run_diff(target);
+                return;
+            }
+            "watch" => {
+                let pct = args
+                    .iter()
+                    .position(|a| a == "--pct" || a == "-p")
+                    .and_then(|idx| args.get(idx + 1))
+                    .and_then(|val| val.parse::<f64>().ok())
+                    .unwrap_or(15.0);
+                run_watch(pct);
+                return;
+            }
+            "update" => {
+                run_update();
                 return;
             }
             "completion" => {

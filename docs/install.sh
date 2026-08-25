@@ -65,8 +65,7 @@ if curl -fsSLI "$RELEASE_URL" >/dev/null 2>&1; then
         # Find binary in extracted archive
         BIN_PATH="$(find "$TMP_DIR" -type f -name "alpheus" | head -n 1)"
         if [ -n "$BIN_PATH" ]; then
-            cp "$BIN_PATH" "$INSTALL_DIR/alpheus"
-            chmod +x "$INSTALL_DIR/alpheus"
+            install -m755 "$BIN_PATH" "$INSTALL_DIR/alpheus"
             INSTALLED=1
         fi
     fi
@@ -81,15 +80,13 @@ if [ "$INSTALLED" -eq 0 ]; then
     if [ -f "$LOCAL_CARGO" ]; then
         echo -e "  Compiling from local source..."
         (cd "$SCRIPT_DIR/../src-tauri" && cargo build --release --bin alpheus)
-        cp "$SCRIPT_DIR/../src-tauri/target/release/alpheus" "$INSTALL_DIR/alpheus"
-        chmod +x "$INSTALL_DIR/alpheus"
+        install -m755 "$SCRIPT_DIR/../src-tauri/target/release/alpheus" "$INSTALL_DIR/alpheus"
         INSTALLED=1
     elif command -v cargo >/dev/null 2>&1 && command -v git >/dev/null 2>&1; then
         echo -e "  Cloning and compiling latest source via cargo..."
         git clone --depth 1 "https://github.com/${REPO}.git" "$TMP_DIR/alpheus-src"
         (cd "$TMP_DIR/alpheus-src/src-tauri" && cargo build --release --bin alpheus)
-        cp "$TMP_DIR/alpheus-src/src-tauri/target/release/alpheus" "$INSTALL_DIR/alpheus"
-        chmod +x "$INSTALL_DIR/alpheus"
+        install -m755 "$TMP_DIR/alpheus-src/src-tauri/target/release/alpheus" "$INSTALL_DIR/alpheus"
         INSTALLED=1
     else
         echo -e "${RED}Error: Precompiled binary not found and Rust/Cargo is not installed.${RESET}"

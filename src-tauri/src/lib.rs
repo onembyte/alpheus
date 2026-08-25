@@ -5,11 +5,13 @@
 //! or buggy webview cannot ask the backend to delete arbitrary paths.
 
 pub mod analyze;
+pub mod browse;
 pub mod disk;
 pub mod dupes;
 pub mod exec;
 pub mod google;
 pub mod history;
+pub mod rules;
 pub mod scan;
 pub mod settings;
 pub mod snapshot;

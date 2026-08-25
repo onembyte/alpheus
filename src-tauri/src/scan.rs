@@ -997,5 +997,8 @@ fn scan_commands() -> Vec<Card> {
         });
     }
 
+    // User-defined rules from ~/.config/alpheus/rules.json
+    out.extend(crate::rules::scan_custom_rules());
+
     out
 }
