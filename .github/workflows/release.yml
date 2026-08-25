@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build-linux-cli:
     runs-on: ubuntu-latest
@@ -26,12 +29,11 @@ jobs:
         run: |
           mkdir -p dist/alpheus-linux-x86_64
           cp src-tauri/target/release/alpheus dist/alpheus-linux-x86_64/
-          cp alpheus.desktop dist/alpheus-linux-x86_64/
-          cp -r plugins/alpheus dist/alpheus-linux-x86_64/
-          cp scripts/install.sh dist/alpheus-linux-x86_64/
-          cp README.md LICENSE dist/alpheus-linux-x86_64/
-          cd dist
-          tar -czvf alpheus-linux-x86_64.tar.gz alpheus-linux-x86_64
+          cp alpheus.desktop dist/alpheus-linux-x86_64/ 2>/dev/null || true
+          cp -r plugins/alpheus dist/alpheus-linux-x86_64/ 2>/dev/null || true
+          cp scripts/install.sh dist/alpheus-linux-x86_64/ 2>/dev/null || true
+          cp README.md LICENSE dist/alpheus-linux-x86_64/ 2>/dev/null || true
+          tar -czvf dist/alpheus-linux-x86_64.tar.gz -C dist alpheus-linux-x86_64
 
       - name: Upload Linux Asset
         uses: softprops/action-gh-release@v2
@@ -43,18 +45,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Frontend build
-        run: |
-          pnpm install
-          pnpm build
-
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Build macOS CLI binary
@@ -65,9 +55,8 @@ jobs:
         run: |
           mkdir -p dist/alpheus-macos
           cp src-tauri/target/release/alpheus dist/alpheus-macos/
-          cp README.md LICENSE dist/alpheus-macos/
-          cd dist
-          tar -czvf alpheus-macos.tar.gz alpheus-macos
+          cp README.md LICENSE dist/alpheus-macos/ 2>/dev/null || true
+          tar -czvf dist/alpheus-macos.tar.gz -C dist alpheus-macos
 
       - name: Upload macOS Asset
         uses: softprops/action-gh-release@v2

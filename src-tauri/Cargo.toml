@@ -1,6 +1,6 @@
 [package]
 name = "alpheus"
-version = "0.8.1"
+version = "0.8.2"
 description = "Honest storage pane for a chronically full MacBook"
 authors = ["Franco Michetti"]
 edition = "2021"

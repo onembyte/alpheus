@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "alpheus",
   "name": "Alpheus Storage",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "author": "Franco Michetti",
   "license": "MIT",
   "description": "Storage breakdown, reclaimable disk monitor, and instant cleanup for Omarchy.",
