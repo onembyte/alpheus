@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alpheus — Storage Manager & Cleanup Engine for Linux & macOS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(18, 24, 38, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --cyan: #38bdf8;
+      --emerald: #34d399;
+      --yellow: #fbbf24;
+      --primary-glow: rgba(56, 189, 248, 0.15);
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1.5rem;
+      background-image: 
+        radial-gradient(circle at 50% 0%, var(--primary-glow) 0%, transparent 60%),
+        radial-gradient(circle at 100% 100%, rgba(52, 211, 153, 0.08) 0%, transparent 50%);
+    }
+    .container {
+      max-width: 900px;
+      width: 100%;
+    }
+    header {
+      text-align: center;
+      margin-top: 3rem;
+      margin-bottom: 2.5rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.85rem;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--cyan);
+      margin-bottom: 1.25rem;
+    }
+    h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #ffffff 40%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .lead {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      max-width: 650px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    .install-box {
+      background: #0d1322;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin: 2.5rem 0;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+    }
+    .install-cmd {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem;
+      color: var(--cyan);
+      overflow-x: auto;
+      white-space: nowrap;
+      user-select: all;
+    }
+    .copy-btn {
+      background: var(--cyan);
+      color: #090d16;
+      border: none;
+      padding: 0.65rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .copy-btn:hover {
+      background: #7dd3fc;
+      transform: translateY(-1px);
+    }
+    .terminal-preview {
+      background: #020617;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 1.25rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: #cbd5e1;
+      overflow-x: auto;
+      margin-bottom: 3rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 3rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      backdrop-filter: blur(12px);
+    }
+    .card h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .card p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    footer {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: auto;
+      padding: 2rem 0;
+    }
+    footer a {
+      color: var(--cyan);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge">✦ Linux (Omarchy / Arch) & macOS Supported</div>
+      <h1>Honest, drillable storage cleanup.</h1>
+      <p class="lead">Deep build cache cleaner, duplicate file detector, and top-bar monitor. Free up gigabytes safely in one command.</p>
+    </header>
+
+    <div class="install-box">
+      <div class="install-cmd" id="installCmd">curl -fsSL https://onembyte.github.io/alpheus/install.sh | bash</div>
+      <button class="copy-btn" onclick="copyInstall()">Copy Command</button>
+    </div>
+
+    <div class="terminal-preview">
+<span style="color:#38bdf8;">$ alpheus scan</span>
+══════════════════════════════════════════════════════════════════════
+  <span style="color:#38bdf8;font-weight:bold;">ALPHEUS STORAGE MANAGER</span>  v0.8.0
+══════════════════════════════════════════════════════════════════════
+  Disk: <span style="font-weight:bold;">189.5 GB free</span> of 476.8 GB (39.7% available)
+
+  <span style="color:#34d399;font-weight:bold;">[SAFE TO RECLAIM]</span> — Regenerable build caches & packages (8.9 GB)
+  ──────────────────────────────────────────────────────────────────
+  <span style="font-weight:bold;">cargo-target</span>               5.1 GB  [<span style="color:#ef4444;">delete</span>]
+    └─ Rust build artifacts (target/ directories)
+  <span style="font-weight:bold;">pacman-cache</span>               1.6 GB  [<span style="color:#a855f7;">command</span>]
+    └─ Pacman package cache ($ sudo paccache -rk2)
+  <span style="font-weight:bold;">coredump-logs</span>              920 MB  [<span style="color:#a855f7;">command</span>]
+    └─ Systemd crash coredumps ($ coredumpctl vacuum --size=50M)
+  <span style="font-weight:bold;">py-cache</span>                   840 MB  [<span style="color:#ef4444;">delete</span>]
+    └─ Python bytecode & tests (__pycache__, .pytest_cache, pip/uv)
+
+  <span style="color:#34d399;font-weight:bold;">Reclaimable:</span> 8.9 GB safe  |  9.4 GB total
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>⚡ Interactive TUI</h3>
+        <p>Run <code>alpheus -i</code> for a full keyboard-driven terminal dashboard with live selection and safe batch cleanup.</p>
+      </div>
+      <div class="card">
+        <h3>📊 Omarchy Top Bar Pill</h3>
+        <p>Real-time disk allocation gauge and instant clean popout panel built specifically for the Omarchy desktop shell.</p>
+      </div>
+      <div class="card">
+        <h3>🔍 Dupes & Hogs</h3>
+        <p>Find duplicate files using SHA-256 (<code>alpheus dupes</code>) and analyze largest directory hogs (<code>alpheus top</code>).</p>
+      </div>
+      <div class="card">
+        <h3>🛡️ Proven Safe</h3>
+        <p>Strict denylist isolation, 5 GB trash threshold, and automatic git verification before deleting <code>node_modules</code>.</p>
+      </div>
+    </div>
+
+    <footer>
+      <p>MIT Licensed • Created by <a href="https://github.com/onembyte/alpheus" target="_blank">onembyte/alpheus</a></p>
+    </footer>
+  </div>
+
+  <script>
+    function copyInstall() {
+      const cmd = document.getElementById('installCmd').innerText;
+      navigator.clipboard.writeText(cmd).then(() => {
+        const btn = document.querySelector('.copy-btn');
+        btn.innerText = 'Copied! ✓';
+        btn.style.background = '#34d399';
+        setTimeout(() => {
+          btn.innerText = 'Copy Command';
+          btn.style.background = '#38bdf8';
+        }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

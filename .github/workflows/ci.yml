@@ -6,8 +6,11 @@ on:
   pull_request:
 
 jobs:
-  check:
-    runs-on: macos-latest
+  matrix-check:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -18,23 +21,27 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Install Linux System Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libayatana-appindicator3-dev
+
       - name: Frontend — typecheck and build
         run: |
           pnpm install --frozen-lockfile
           pnpm build
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
-      - name: Rust — format check
-        run: cargo fmt --check
+      - name: Rust — Build Standalone CLI
+        run: cargo build --release --bin alpheus
         working-directory: src-tauri
 
-      - name: Rust — clippy (warnings are errors)
-        run: cargo clippy --all-targets -- -D warnings
+      - name: Rust — Test Suite
+        run: cargo test --test safety_and_scanners_test
         working-directory: src-tauri

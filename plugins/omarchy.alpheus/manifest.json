@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "omarchy.alpheus",
+  "name": "Alpheus Storage",
+  "version": "0.8.0",
+  "author": "Franco Michetti",
+  "license": "MIT",
+  "description": "Storage breakdown, reclaimable disk monitor, and instant cleanup for Omarchy.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Alpheus Storage",
+    "description": "Disk space monitor & cleaner",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "refreshIntervalSec": 60
+    }
+  }
+}

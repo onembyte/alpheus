@@ -5,212 +5,242 @@
 <h1 align="center">Alpheus</h1>
 
 <p align="center">
-  The macOS storage pane — but honest, drillable, and able to actually fix things.
+  The storage manager and cleanup engine for macOS and Linux (Omarchy / Arch). Honest, drillable, and safe.
   <br />
   <a href="#why">Why</a> ·
-  <a href="#what-it-does">What it does</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#cli-reference">CLI Reference</a> ·
+  <a href="#installation">Installation</a> ·
+  <a href="#omarchy-widget">Omarchy Top Bar Widget</a> ·
   <a href="#safety-model">Safety model</a> ·
-  <a href="#architecture">Architecture</a> ·
-  <a href="#getting-started">Getting started</a>
+  <a href="#architecture">Architecture</a>
 </p>
 
 <p align="center">
-  <img src="https://github.com/onembyte/alpheus/actions/workflows/ci.yml/badge.svg" alt="CI" />
-  <img src="https://img.shields.io/badge/platform-macOS-black" alt="macOS" />
-  <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" />
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20(Omarchy%20%2F%20Arch)-blue" alt="Platforms" />
+  <img src="https://img.shields.io/badge/UI-Tauri%20GUI%20%2B%20Terminal%20TUI%20%2B%20Quickshell-teal" alt="Interfaces" />
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License" />
 </p>
 
-<p align="center">
-  <a href="https://github.com/onembyte/alpheus/releases/latest/download/Alpheus-macOS.dmg">
-    <img src="docs/download-button.svg" width="400" alt="Download Alpheus — macOS universal, Apple Silicon and Intel" />
-  </a>
-  <br />
-  <sub>Not yet notarized — after dragging to Applications, run the one-line command in <a href="#install">Install</a>.</sub>
-</p>
+---
 
-<p align="center">
-  <img src="docs/design/overview.png" width="704" alt="Overview — allocation ring, capacity bar, mounted volumes" />
-</p>
-<p align="center">
-  <img src="docs/design/breakdown.png" width="284" alt="Breakdown by category" />
-  <img src="docs/design/duplicates-inspector.png" width="284" alt="Duplicates and volume inspector" />
-  <img src="docs/design/inspector-actions.png" width="130" alt="Snapshots and quick actions" />
-</p>
-<p align="center"><sub>The Alpheus design system — liquid glass, designed in Claude Design.</sub></p>
+## Why
 
-## Install
+Every developer workstation slowly fills up with gigabytes of dead weight: forgotten Docker VM disks, dozens of `node_modules`, compiled Cargo `target/` directories, Pacman package caches, Xcode DerivedData, stale coredumps, and browser caches.
 
-One universal build runs natively on both Apple Silicon and Intel Macs —
-there's nothing to choose. Download the DMG above, drag **Alpheus** to
-Applications, then run this once:
+Finding and cleaning them usually means running messy, unsafe `du` and `find -delete` commands. **Alpheus** turns that into a unified, safe, one-glance tool with three interfaces:
+1. **Interactive Terminal CLI & TUI (`alpheus`)** for terminal workflows on Linux & macOS.
+2. **Omarchy Top Bar Quickshell Widget** for instant live stats and one-click cleanup on Arch / Omarchy OS.
+3. **Liquid Glass Desktop GUI (`alpheus-app`)** on macOS and Linux desktop environments.
+
+---
+
+## Features
+
+- **Deep Developer Scanners** (`du -sk` exact byte measurements, parallelized in Rust):
+  - **Rust Projects**: Cargo `target/` build directories.
+  - **JavaScript / Web**: `node_modules` (verified against git status before offering one-click deletion) and `.next` build outputs.
+  - **Python**: `__pycache__`, `.pytest_cache`, `.ruff_cache`, `.mypy_cache`, and pip/uv/poetry caches.
+  - **Package Managers**: Pacman cache (`/var/cache/pacman/pkg`), Yay / AUR build cache (`~/.cache/yay`), npm, pnpm, NuGet, Go modules, Playwright browsers, Homebrew.
+  - **Containers & Runtimes**: Docker & Podman (`docker system prune`), Colima VM disks, Flatpak unused runtimes (`flatpak uninstall --unused`).
+  - **System Logs & Coredumps**: Systemd journal logs (`journalctl --vacuum-size`), crash coredumps (`/var/lib/systemd/coredump`).
+  - **App Scratch & Caches**: `~/.cache` (Linux) and `~/Library/Caches` (macOS), Spotify cache, VS Code cached extensions.
+  - **Stale Downloads**: Unaccessed large files in `~/Downloads` untouched for >30 days.
+  - **macOS Specific**: Xcode DerivedData, iOS DeviceSupport symbols, iOS Simulators, Time Machine APFS snapshots.
+  - **Trash**: FreeDesktop Trash (`~/.local/share/Trash`) and macOS Trash (`~/.Trash`).
+
+- **Proven Safe Before Deleting**:
+  - `node_modules` are only marked safe when the git repo is *clean, has a remote, and has zero unpushed commits* — the card displays the git proof.
+  - Hard denylist prevents touching anything outside `$HOME` (except allowlisted system caches).
+  - Dry run preview is re-verified before any file removal.
+
+- **Automated Background Maintenance**:
+  - Built-in `alpheus schedule` sets up a systemd user timer on Linux for background safe cleanup.
+
+---
+
+## Quick Installation
+
+Install the Alpheus CLI and shell completions with a single command:
+
+```bash
+curl -fsSL https://onembyte.github.io/alpheus/install.sh | bash
+```
+
+*(Or via raw GitHub link)*:
+```bash
+curl -fsSL https://raw.githubusercontent.com/onembyte/alpheus/main/scripts/install.sh | bash
+```
+
+---
+
+## Installation by Platform
+
+### Linux (Omarchy OS / Arch Linux)
+
+#### 1. From Source / Cargo:
+
+```bash
+# Clone repository
+git clone https://github.com/onembyte/alpheus.git
+cd alpheus/src-tauri
+
+# Build optimized release binary and install to ~/.local/bin
+cargo build --release --bin alpheus
+cp target/release/alpheus ~/.local/bin/alpheus
+
+# Verify installation
+alpheus scan
+```
+
+#### 2. Install the Omarchy Top Bar Quickshell Widget:
+
+```bash
+# Create plugin directory
+mkdir -p ~/.config/omarchy/plugins/omarchy.alpheus
+
+# Link or copy the widget
+cp -r ~/.config/omarchy/plugins/omarchy.alpheus/* ~/.config/omarchy/plugins/omarchy.alpheus/ 2>/dev/null || true
+```
+
+Add `"omarchy.alpheus"` to `~/.config/omarchy/shell.json` in your plugins and bar layout:
+
+```json
+{
+  "bar": {
+    "layout": {
+      "right": [
+        { "id": "omarchy.power" },
+        { "id": "omarchy.alpheus" }
+      ]
+    }
+  },
+  "plugins": [
+    "omarchy.alpheus"
+  ]
+}
+```
+
+#### 3. Enable Automated Weekly Background Cleaning (Optional):
+
+```bash
+alpheus schedule enable
+```
+
+---
+
+### macOS
+
+#### 1. Desktop App Installation:
+
+Download the latest `Alpheus-macOS.dmg`, drag **Alpheus** to Applications, then remove the quarantine attribute:
 
 ```bash
 xattr -d com.apple.quarantine /Applications/Alpheus.app
 ```
 
-Then open it normally. (If it replies `No such xattr`, the tag was already
-gone — just open the app.)
+#### 2. Standalone CLI:
 
-<details>
-<summary><b>Why is that needed — and is it safe?</b></summary>
+```bash
+cd alpheus/src-tauri
+cargo build --release --bin alpheus
+cp target/release/alpheus /usr/local/bin/alpheus
+```
 
-macOS tags everything a browser downloads with a `com.apple.quarantine`
-attribute. Apps that aren't **notarized** by Apple are refused with a scary
-message — often *"Alpheus is damaged and can't be opened"*, which is
-misleading: nothing is damaged, and right-click → Open does **not** get past
-it. The command above removes the download tag, which is the same decision
-you make when you click through any "open anyway" dialog.
+---
 
-Note the command is `-d`, not `-dr`: older macOS versions ship an `xattr`
-without the recursive `-r` flag, and clearing the tag on the bundle itself is
-what Gatekeeper checks anyway.
+## CLI Reference
 
-Notarization requires a paid Apple Developer account; it's on the roadmap.
-Until then you're trusting this repo — the builds are ad-hoc signed and
-reproducible from source with `pnpm tauri build`, and everything the app can
-delete is listed in the [safety model](#safety-model). If you'd rather not
-run a downloaded binary, build it yourself: the [Getting started](#getting-started)
-steps produce the same app.
+### `alpheus scan`
+Scans the filesystem and displays a color-coded table of reclaimable items categorized by safety tier:
+```bash
+alpheus scan
+```
 
-</details>
+### `alpheus -i` (Interactive TUI)
+Launches the full interactive terminal menu with keyboard navigation:
+- `↑` / `k`, `↓` / `j`: Move selection
+- `[Space]`: Toggle category selection
+- `[a]`: Select all safe categories
+- `[n]`: Clear all selections
+- `[Enter]`: Execute cleanup for all selected items
+- `[q]` / `[Esc]`: Exit without cleaning
 
-## Why
+```bash
+alpheus -i
+```
 
-Every developer Mac slowly fills up, and when it does, macOS Settings shows a
-giant, unexplained **"System Data"** blob and offers no way to act on it. The
-real story is always the same cast of characters — a forgotten Docker VM disk,
-a dozen `node_modules`, Xcode's DerivedData and device symbols, app caches,
-staged OS updates — and finding them means terminal archaeology with `du`
-every single time.
+### `alpheus status --json`
+Outputs a complete JSON summary including disk space, tier breakdown, and list of cards (used by the Omarchy top bar widget and custom scripts):
+```bash
+alpheus status --json
+```
 
-This app was born from one such archaeology session on a chronically full
-245 GB MacBook (~90 GB of "System Data" decoded by hand). It turns that
-one-off audit into a permanent, one-glance, one-click desktop tool.
+### `alpheus dry-run <category-id>`
+Previews the exact paths, per-path byte sizes, execution method, and safety warnings for a category:
+```bash
+alpheus dry-run cargo-target
+alpheus dry-run pacman-cache
+```
 
-## Design
+### `alpheus clean <category-id> [-y]`
+Cleans a specific category with confirmation prompt (or pass `-y` to proceed immediately):
+```bash
+alpheus clean cargo-target -y
+```
 
-The UI is a liquid-glass design system (designed in Claude Design): a
-token-driven set of glass surfaces over an animated wallpaper, with full
-dark **and** light appearances (System/Light/Dark in Settings), an allocation ring
-and glossy capacity bar fed by real scan data, breakdown-style rows with
-proportional bars, a top-drop confirmation sheet, and SF-mono typography
-for every number and path. Decorative motion respects
-`prefers-reduced-motion`.
+### `alpheus clean --all-safe [-y]`
+Reclaims all `safe`-tier categories in one go:
+```bash
+alpheus clean --all-safe -y
+```
 
-## What it does
+### `alpheus schedule [enable | disable | status]`
+Configures systemd user background timer to automatically clean safe caches:
+```bash
+alpheus schedule enable
+alpheus schedule status
+```
 
-- **Scans the real space hogs** in parallel (`du -sk` actuals, not estimates):
-  Docker/colima VM disks, per-project `node_modules` and `.next`, Xcode
-  DerivedData / device symbols / simulators, `~/Library/Caches`, Spotify,
-  package-manager caches (npm, pnpm, NuGet, CocoaPods, Go, Playwright),
-  iPhone backups, Time Machine local snapshots, the Finder Trash, and staged
-  macOS updates.
-- **Explains every finding in human terms** on a reclaim card: what it is, how
-  big it is, what happens if you remove it, and exactly which paths die.
-- **Proves it's safe before offering one click.** `node_modules` folders are
-  only marked safe when the owning repo is *clean, has a remote, and has zero
-  unpushed commits* — the card shows the `git status` evidence. Everything
-  else lands in a "needs a decision" tier with a mandatory review dialog.
-- **Lives in the menu bar**: the free-space number is always visible, turns
-  into a ⚠️ warning below a configurable threshold, and clicking it opens the
-  main window.
-- **Scans and cleans on a schedule**: optional background scans (hourly to
-  daily) with low-space notifications, plus opt-in automatic cleanup of
-  safe-tier categories you mark — enforced in Rust to the safe tier only.
-- **Logs every action** to a history view — "freed 23.4 GB on Aug 3", with
-  automatic runs tagged `auto`.
-- **Google Drive, bring-your-own-keys**: paste your own OAuth Desktop client
-  in Settings and Alpheus shows your quota, finds exact duplicates by
-  md5 checksum (no downloads), and reclaims into Drive's 30-day Trash.
-  Tokens live in the macOS Keychain; nothing Google-related ships with
-  the app.
+### `alpheus history`
+Shows the historical log of all cleanup actions and total disk space freed:
+```bash
+alpheus history
+```
 
-## Safety model
+---
 
-The interesting part of a disk cleaner is not deleting files — it's making it
-structurally hard to delete the wrong ones. All rules live in the Rust
-backend and hold no matter what the UI requests:
+## Safety Model
 
 | Rule | Enforcement |
 |---|---|
-| Three tiers | `safe` (green, regenerable, one click) · `with-care` (yellow, confirm dialog + checkbox) · `manual` (grey, explain-only, no action wired) |
-| Dry run before any delete | The confirm dialog lists the exact paths with per-path sizes, freshly re-measured |
-| Denylist | Nothing outside `$HOME`; never `~/Documents/prod`, `~/.ssh`, `~/.claude`, `~/Library/Keychains` — checked at scan **and** execute time |
-| Trash first | Totals under 5 GB go to the Finder Trash (reversible); direct `rm` is reserved for an allowlist of known-regenerable card ids; iPhone backups go to the Trash at any size |
-| No path injection | The frontend can only send a card *id* over IPC — paths, sizes and methods come from the backend's own last scan |
-| No shell injection | Command cards (`brew cleanup`, `xcrun simctl`, `tmutil`) run a fixed argv keyed by card id; no frontend string reaches a shell |
-| No root | Everything is user-space; system-level items (staged OS updates) are explain-only cards |
+| **Three tiers** | `safe` (green, regenerable) · `with-care` (yellow, confirm dialog) · `manual` (grey, informational) |
+| **Dry run before delete** | All targets are re-measured and listed before execution |
+| **Denylist** | Refuses deletion of anything outside `$HOME` except allowlisted system caches (`/var/cache/pacman/pkg`, `/var/lib/systemd/coredump`); untouchables like `~/.ssh`, `~/.claude`, `~/Documents/prod` are hard-blocked |
+| **Trash threshold** | Deletions under 5 GB go to FreeDesktop / macOS Trash; direct `rm` is only permitted for allowlisted regenerable targets |
+| **Allowlisted commands** | Command cards (`paccache`, `journalctl`, `coredumpctl`, `docker system prune`) run fixed argvs with no shell injection |
 
-## Architecture
+---
 
-Tauri 2 · Rust backend · React + TypeScript + Tailwind 4 frontend.
-
-```mermaid
-flowchart LR
-    subgraph Frontend["WebView — React + TS"]
-        UI["Reclaim cards · dry-run dialog · history"]
-    end
-    subgraph Backend["Rust"]
-        SCAN["scan.rs\nparallel du scanners\n+ git verification"]
-        EXEC["exec.rs\ndenylist · trash-vs-rm\nallowlisted commands"]
-        STATE["ScanState\ncards from last scan"]
-        TRAY["tray\nfree-GB in menu bar"]
-    end
-    UI -- "card id only" --> STATE
-    STATE --> EXEC
-    SCAN --> STATE
-    EXEC --> HIST["history.json"]
-```
-
-- **`scan.rs`** — category scanners run in scoped threads; sizes come from
-  batched `du -sk` calls; per-project git checks produce the "proof" shown on
-  cards. Produces data only, never deletes.
-- **`exec.rs`** — the single module allowed to remove anything. Re-verifies
-  the denylist per path, chooses Trash vs `rm` by size and allowlist,
-  and maps command cards to fixed argv.
-- **`lib.rs`** — IPC commands, tray icon with a live free-space title
-  (refreshed every 60 s), close-to-tray window behavior.
-- **Frontend** — tier-grouped cards, a usage meter (in use / safe to reclaim /
-  needs a decision / free), dry-run confirm modal, history log. No state of
-  its own beyond the last scan response.
-
-## Getting started
-
-Requires macOS, [rustup](https://rustup.rs), Node 22+, and pnpm.
-
-```bash
-pnpm install
-pnpm tauri dev     # run in development
-pnpm tauri build   # produce the .app bundle
-```
-
-First run: macOS will ask for access to folders like Documents — that's the
-scanner measuring your projects. The first scan takes up to a minute; rescans
-are seconds.
-
-```bash
-pnpm icons         # regenerate all icons (zero-dependency PNG writer)
-```
-
-## Project layout
+## Project Layout
 
 ```
-src/                    React frontend (cards, dialog, meter, history)
-src-tauri/src/scan.rs   category scanners + git verification
-src-tauri/src/exec.rs   safety rules + executor
-src-tauri/src/lib.rs    IPC, tray, window lifecycle
-src-tauri/src/disk.rs   df-based disk usage
-src-tauri/src/history.rs  action log
-scripts/make-icons.mjs  procedural app/tray icons (no image deps)
+├── src/                    # React + TypeScript desktop GUI
+├── src-tauri/
+│   ├── src/bin/alpheus.rs  # Standalone CLI & Interactive TUI binary
+│   ├── src/scan.rs         # Parallel multi-platform scanners & git proofs
+│   ├── src/exec.rs         # Safety rules & execution engine
+│   ├── src/disk.rs         # POSIX disk usage parser
+│   ├── src/history.rs      # JSON action log
+│   ├── src/google.rs       # Google Drive BYOK integration
+│   └── src/lib.rs          # Core library & Tauri bindings
+└── ~/.config/omarchy/plugins/omarchy.alpheus/ # Omarchy Quickshell Widget
+    ├── manifest.json       # Omarchy plugin manifest
+    ├── BarWidget.qml       # Top bar disk indicator
+    └── Panel.qml           # Popout dropdown panel
 ```
 
-## Roadmap
-
-- **Offload to NAS**: pick a cold folder → upload via WebDAV or rsync →
-  checksum-verify the remote copy → only then reclaim locally, leaving a
-  `.offloaded` breadcrumb.
-- Incremental scan cache (SQLite) so rescans only re-measure changed roots.
-- Signed + notarized builds.
+---
 
 ## License
 

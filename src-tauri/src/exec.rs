@@ -1,8 +1,8 @@
 //! The only module allowed to remove anything — and it refuses to be creative.
 //!
-//! Hard rules, enforced here regardless of what the UI asks for:
+//! Hard rules, enforced here regardless of what the UI/CLI asks for:
 //! - every path is re-checked against the denylist at execute time
-//! - totals under 5 GB go to the Finder Trash (reversible); direct `rm` is
+//! - totals under 5 GB go to the Trash (reversible); direct `rm` is
 //!   reserved for card ids on the known-regenerable allowlist
 //! - command cards run a fixed argv keyed by card id — no frontend input ever
 //!   reaches a shell
@@ -43,6 +43,10 @@ const RM_ALLOWED: &[&str] = &[
     "node-modules-verified",
     "node-modules-unverified",
     "next-builds",
+    "cargo-target",
+    "py-cache",
+    "yay-cache",
+    "xdg-cache",
     "xcode-derived",
     "xcode-devicesupport",
     "library-caches",
@@ -51,6 +55,7 @@ const RM_ALLOWED: &[&str] = &[
     "spotify-cache",
     "claude-vm",
     "leftovers",
+    "stale-downloads",
     "trash",
 ];
 
@@ -147,8 +152,8 @@ pub fn execute(card: &Card) -> Result<ExecResult, String> {
 
             if method == "delete" {
                 for p in &paths {
-                    // Go/NuGet caches ship read-only files; make them deletable first.
-                    let _ = Command::new("/bin/chmod")
+                    // Make read-only files (e.g. Go modules) writable before removing
+                    let _ = Command::new("chmod")
                         .args(["-R", "u+w"])
                         .arg(p)
                         .output();
@@ -194,6 +199,15 @@ fn empty_trash_dirs(trash_dirs: &[PathBuf]) -> Result<(), String> {
                 let _ = remove_path(&e.path());
             }
         }
+        // Linux XDG trash subdirectories
+        for sub in &["files", "info", "expunged"] {
+            let sub_dir = dir.join(sub);
+            if let Ok(rd) = std::fs::read_dir(&sub_dir) {
+                for e in rd.flatten() {
+                    let _ = remove_path(&e.path());
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -203,30 +217,54 @@ fn empty_trash_dirs(trash_dirs: &[PathBuf]) -> Result<(), String> {
 fn run_command_card(card: &Card) -> Result<ExecResult, String> {
     let before = crate::disk::usage().free_kb;
     match card.id.as_str() {
+        "pacman-cache" => {
+            if Path::new("/usr/bin/paccache").exists() {
+                run_ok(&["paccache", "-rk2"])?;
+            } else {
+                run_ok(&["pacman", "-Sc", "--noconfirm"])?;
+            }
+        }
+        "journal-logs" => {
+            run_ok(&["journalctl", "--vacuum-size=200M"])?;
+        }
+        "coredump-logs" => {
+            if Path::new("/usr/bin/coredumpctl").exists() {
+                run_ok(&["coredumpctl", "vacuum", "--size=50M"])?;
+            }
+        }
+        "flatpak-unused" => {
+            run_ok(&["flatpak", "uninstall", "--unused", "-y"])?;
+        }
+        "docker-prune" => {
+            run_ok(&["docker", "system", "prune", "-f"])?;
+        }
         "brew-cleanup" => {
-            let brew = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
-                .iter()
-                .find(|p| Path::new(p).exists())
-                .copied()
-                .ok_or("brew not found")?;
+            let brew = [
+                "/opt/homebrew/bin/brew",
+                "/usr/local/bin/brew",
+                "/home/linuxbrew/.linuxbrew/bin/brew",
+            ]
+            .iter()
+            .find(|p| Path::new(p).exists())
+            .copied()
+            .ok_or("brew not found")?;
             run_ok(&[brew, "cleanup", "--prune=all"])?;
         }
         "xcode-simulators" => {
             run_ok(&["/usr/bin/xcrun", "simctl", "delete", "unavailable"])?;
         }
         "tm-snapshots" => {
-            let out = Command::new("/usr/bin/tmutil")
+            let out = Command::new("tmutil")
                 .args(["listlocalsnapshots", "/"])
                 .output()
                 .map_err(|e| e.to_string())?;
             for line in String::from_utf8_lossy(&out.stdout).lines() {
-                // com.apple.TimeMachine.2026-08-03-123456.local → the date token
                 if let Some(date) = line
                     .trim()
                     .strip_prefix("com.apple.TimeMachine.")
                     .and_then(|s| s.strip_suffix(".local"))
                 {
-                    let _ = Command::new("/usr/bin/tmutil")
+                    let _ = Command::new("tmutil")
                         .args(["deletelocalsnapshots", date])
                         .output();
                 }
@@ -254,7 +292,7 @@ fn run_ok(argv: &[&str]) -> Result<(), String> {
     }
 }
 
-fn fmt(kb: u64) -> String {
+pub fn fmt(kb: u64) -> String {
     let gb = kb as f64 / (1024.0 * 1024.0);
     if gb >= 1.0 {
         format!("{gb:.1} GB")

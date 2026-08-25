@@ -1,15 +1,17 @@
 //! Disk scanner: turns the raw filesystem into curated reclaim cards.
 //!
-//! Every category here corresponds to a real macOS space hog (Docker VM disks,
-//! per-project `node_modules`, Xcode leftovers, app caches, iPhone backups…).
+//! Scans developer artifacts (node_modules, .next, Cargo target/, Python caches),
+//! package manager stores (Pacman, Yay, npm, pnpm, NuGet, Go, Pip, UV, Poetry),
+//! system logs/coredumps/caches, Docker/Flatpak, and Trash on Linux & macOS.
 //! Scanners run in parallel threads; sizes are `du -sk` actuals, not estimates.
 //! Nothing in this module deletes anything — see `exec` for that.
 
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::SystemTime;
 
 #[derive(Serialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -41,19 +43,29 @@ pub struct Card {
 }
 
 pub fn home() -> PathBuf {
-    PathBuf::from(std::env::var("HOME").expect("HOME not set"))
+    PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| "/".into()))
 }
 
-/// Hard denylist from HANDOFF.md: nothing outside $HOME is ever deletable,
+/// Hard denylist: nothing outside $HOME is ever deletable directly,
 /// and these subtrees are untouchable even inside it.
 pub fn is_denied(p: &Path) -> bool {
     let h = home();
     if !p.starts_with(&h) {
+        let system_allowed = [
+            Path::new("/var/cache/pacman/pkg"),
+            Path::new("/var/log/journal"),
+            Path::new("/var/lib/systemd/coredump"),
+            Path::new("/System/Volumes/Update"),
+        ];
+        if system_allowed.iter().any(|allowed| p.starts_with(allowed)) {
+            return false;
+        }
         return true;
     }
     [
         h.join("Documents/prod"),
         h.join(".ssh"),
+        h.join(".gnupg"),
         h.join(".claude"),
         h.join("Library/Keychains"),
     ]
@@ -67,7 +79,7 @@ pub fn du_many_kb(paths: &[PathBuf]) -> HashMap<PathBuf, u64> {
     if paths.is_empty() {
         return map;
     }
-    let mut cmd = Command::new("/usr/bin/du");
+    let mut cmd = Command::new("du");
     cmd.arg("-sk");
     for p in paths {
         cmd.arg(p);
@@ -94,30 +106,38 @@ pub fn du_kb(path: &Path) -> u64 {
 }
 
 pub fn scan_all() -> Vec<Card> {
-    let (a, b, c, d, e) = std::thread::scope(|s| {
+    let (a, b, c, d, e, f) = std::thread::scope(|s| {
         let h1 = s.spawn(scan_projects);
-        let h2 = s.spawn(scan_xcode);
+        let h2 = s.spawn(scan_platform_dev);
         let h3 = s.spawn(scan_caches);
         let h4 = s.spawn(scan_simple);
         let h5 = s.spawn(scan_commands);
+        let h6 = s.spawn(scan_stale_downloads);
         (
             h1.join().unwrap_or_default(),
             h2.join().unwrap_or_default(),
             h3.join().unwrap_or_default(),
             h4.join().unwrap_or_default(),
             h5.join().unwrap_or_default(),
+            h6.join().unwrap_or_default(),
         )
     });
-    let mut cards: Vec<Card> = [a, b, c, d, e].into_iter().flatten().collect();
+    let mut cards: Vec<Card> = [a, b, c, d, e, f].into_iter().flatten().collect();
     cards.sort_by_key(|c| std::cmp::Reverse(c.size_kb));
     cards
 }
 
 // ---------------------------------------------------------------- projects
 
-/// Depth-limited walk collecting node_modules/.next dirs. Never follows
-/// symlinks, never descends into the artifacts themselves.
-fn find_artifacts(root: &Path, depth: usize, nm: &mut Vec<PathBuf>, nx: &mut Vec<PathBuf>) {
+/// Depth-limited walk collecting node_modules, .next, target, and python caches.
+fn find_artifacts(
+    root: &Path,
+    depth: usize,
+    nm: &mut Vec<PathBuf>,
+    nx: &mut Vec<PathBuf>,
+    targets: &mut Vec<PathBuf>,
+    pycaches: &mut Vec<PathBuf>,
+) {
     if depth == 0 {
         return;
     }
@@ -142,10 +162,24 @@ fn find_artifacts(root: &Path, depth: usize, nm: &mut Vec<PathBuf>, nx: &mut Vec
             }
             continue;
         }
-        if name.starts_with('.') || name == "Library" {
+        if name == "target" {
+            if let Some(parent) = path.parent() {
+                if parent.join("Cargo.toml").exists() && !is_denied(&path) {
+                    targets.push(path);
+                    continue;
+                }
+            }
+        }
+        if name == "__pycache__" || name == ".pytest_cache" || name == ".ruff_cache" || name == ".mypy_cache" {
+            if !is_denied(&path) {
+                pycaches.push(path);
+            }
             continue;
         }
-        find_artifacts(&path, depth - 1, nm, nx);
+        if name.starts_with('.') || name == "Library" || name == ".local" || name == ".cache" {
+            continue;
+        }
+        find_artifacts(&path, depth - 1, nm, nx, targets, pycaches);
     }
 }
 
@@ -154,16 +188,32 @@ struct GitProof {
     summary: String,
 }
 
-/// The "show proof" check from HANDOFF.md: a repo counts as verified only if
-/// it is clean, has a remote, and has nothing unpushed.
+/// Verifies whether the enclosing Git repository is clean, pushed, and has a remote.
 fn git_verify(project: &Path) -> Option<GitProof> {
-    if !project.join(".git").exists() {
-        return None;
-    }
+    let toplevel = Command::new("git")
+        .arg("-C")
+        .arg(project)
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .ok()
+        .filter(|out| out.status.success())
+        .map(|out| PathBuf::from(String::from_utf8_lossy(&out.stdout).trim()));
+
+    let repo_root = match toplevel {
+        Some(root) if root.exists() => root,
+        _ => {
+            if project.join(".git").exists() {
+                project.to_path_buf()
+            } else {
+                return None;
+            }
+        }
+    };
+
     let run = |args: &[&str]| -> Option<String> {
-        let out = Command::new("/usr/bin/git")
+        let out = Command::new("git")
             .arg("-C")
-            .arg(project)
+            .arg(&repo_root)
             .args(args)
             .output()
             .ok()?;
@@ -195,25 +245,58 @@ fn git_verify(project: &Path) -> Option<GitProof> {
     Some(GitProof { ok, summary })
 }
 
-/// Roots walked for per-project artifacts, with their max depth. `~/Documents`
-/// is where projects live by convention; extra roots cover tools that vendor
-/// their own node_modules outside it.
+/// Auto-discovers common developer roots across Linux and macOS.
 fn project_roots() -> Vec<(PathBuf, usize)> {
     let h = home();
-    vec![(h.join("Documents"), 5), (h.join(".hermes"), 3)]
+    let candidates = [
+        "Projects",
+        "Developer",
+        "code",
+        "Code",
+        "src",
+        "workspace",
+        "Workspace",
+        "dev",
+        "Dev",
+        "repos",
+        "Documents",
+        ".hermes",
+    ];
+    let mut roots = Vec::new();
+    let mut seen = HashSet::new();
+
+    for name in candidates {
+        let dir = h.join(name);
+        if dir.is_dir() && !is_denied(&dir) {
+            let canonical = dir.canonicalize().unwrap_or_else(|_| dir.clone());
+            if seen.insert(canonical) {
+                let depth = if name == ".hermes" { 3 } else { 5 };
+                roots.push((dir, depth));
+            }
+        }
+    }
+    roots
 }
 
 fn scan_projects() -> Vec<Card> {
     let mut nm: Vec<PathBuf> = vec![];
     let mut nx: Vec<PathBuf> = vec![];
+    let mut targets: Vec<PathBuf> = vec![];
+    let mut pycaches: Vec<PathBuf> = vec![];
+
     for (root, depth) in project_roots() {
-        find_artifacts(&root, depth, &mut nm, &mut nx);
+        find_artifacts(&root, depth, &mut nm, &mut nx, &mut targets, &mut pycaches);
     }
 
-    let all: Vec<PathBuf> = nm.iter().chain(nx.iter()).cloned().collect();
+    let all: Vec<PathBuf> = nm
+        .iter()
+        .chain(nx.iter())
+        .chain(targets.iter())
+        .chain(pycaches.iter())
+        .cloned()
+        .collect();
     let sizes = du_many_kb(&all);
 
-    // (paths, total_kb, proof lines)
     let mut verified: (Vec<String>, u64, Vec<String>) = (vec![], 0, vec![]);
     let mut unverified: (Vec<String>, u64, Vec<String>) = (vec![], 0, vec![]);
 
@@ -239,7 +322,7 @@ fn scan_projects() -> Vec<Card> {
         out.push(Card {
             id: "node-modules-verified".into(),
             title: "node_modules — verified repos".into(),
-            description: "Dependency folders of projects whose git repo is clean, pushed, and has a remote (proof below). npm/pnpm install restores them from the lockfile.".into(),
+            description: "Dependency folders of projects whose git repo is clean, pushed, and has a remote. npm/pnpm/yarn install restores them from the lockfile.".into(),
             tier: Tier::Safe,
             size_kb: verified.1,
             paths: verified.0,
@@ -252,7 +335,7 @@ fn scan_projects() -> Vec<Card> {
         out.push(Card {
             id: "node-modules-unverified".into(),
             title: "node_modules — unverified projects".into(),
-            description: "Projects with no git remote, uncommitted or unpushed work, or no repo at all. The node_modules folders themselves are regenerable, but these projects may have no backup anywhere — push them to a remote first.".into(),
+            description: "Projects with no git remote, uncommitted or unpushed work, or no repo at all. These projects may have no remote backup — push them first.".into(),
             tier: Tier::WithCare,
             size_kb: unverified.1,
             paths: unverified.0,
@@ -267,7 +350,7 @@ fn scan_projects() -> Vec<Card> {
             id: "next-builds".into(),
             title: ".next build outputs".into(),
             description:
-                "Next.js build directories — regenerated by the next `next build` or `next dev`."
+                "Next.js build directories — regenerated on demand by `next build` or `next dev`."
                     .into(),
             tier: Tier::WithCare,
             size_kb: total,
@@ -277,50 +360,139 @@ fn scan_projects() -> Vec<Card> {
             command_display: None,
         });
     }
+    if !targets.is_empty() {
+        let total: u64 = targets
+            .iter()
+            .map(|p| sizes.get(p).copied().unwrap_or(0))
+            .sum();
+        if total >= 1024 {
+            out.push(Card {
+                id: "cargo-target".into(),
+                title: "Rust Cargo build directories (target/)".into(),
+                description:
+                    "Compiled Rust binaries and intermediate object files. Regenerated on next `cargo build`."
+                        .into(),
+                tier: Tier::Safe,
+                size_kb: total,
+                paths: targets
+                    .iter()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .collect(),
+                proof: None,
+                action: ActionKind::Delete,
+                command_display: None,
+            });
+        }
+    }
+    if !pycaches.is_empty() {
+        let total: u64 = pycaches
+            .iter()
+            .map(|p| sizes.get(p).copied().unwrap_or(0))
+            .sum();
+        if total >= 1024 {
+            out.push(Card {
+                id: "py-cache".into(),
+                title: "Python bytecode & test caches (__pycache__, .pytest_cache)".into(),
+                description:
+                    "Compiled Python bytecode (.pyc) and test/linter caches. Automatically regenerated by Python on run."
+                        .into(),
+                tier: Tier::Safe,
+                size_kb: total,
+                paths: pycaches
+                    .iter()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .collect(),
+                proof: None,
+                action: ActionKind::Delete,
+                command_display: None,
+            });
+        }
+    }
     out
 }
 
-// ---------------------------------------------------------------- xcode
+// ---------------------------------------------------------------- platform dev (Xcode / Linux)
 
-fn scan_xcode() -> Vec<Card> {
+fn scan_platform_dev() -> Vec<Card> {
     let mut out = vec![];
-    let xcode = home().join("Library/Developer/Xcode");
 
-    let mut derived: Vec<PathBuf> = vec![];
-    if let Ok(rd) = fs::read_dir(&xcode) {
-        for e in rd.flatten() {
-            if e.file_name().to_string_lossy().starts_with("DerivedData") {
-                derived.push(e.path());
+    // macOS Xcode
+    #[cfg(target_os = "macos")]
+    {
+        let xcode = home().join("Library/Developer/Xcode");
+        let mut derived: Vec<PathBuf> = vec![];
+        if let Ok(rd) = fs::read_dir(&xcode) {
+            for e in rd.flatten() {
+                if e.file_name().to_string_lossy().starts_with("DerivedData") {
+                    derived.push(e.path());
+                }
+            }
+        }
+        let sizes = du_many_kb(&derived);
+        let total: u64 = sizes.values().sum();
+        if total >= 1024 {
+            out.push(Card {
+                id: "xcode-derived".into(),
+                title: "Xcode DerivedData".into(),
+                description: "Build caches and indexes. Xcode regenerates them — the first build after cleanup is slower, nothing is lost.".into(),
+                tier: Tier::Safe,
+                size_kb: total,
+                paths: derived.iter().map(|p| p.to_string_lossy().to_string()).collect(),
+                proof: None,
+                action: ActionKind::Delete,
+                command_display: None,
+            });
+        }
+
+        let device_support = xcode.join("iOS DeviceSupport");
+        if device_support.exists() {
+            let kb = du_kb(&device_support);
+            if kb >= 1024 {
+                out.push(Card {
+                    id: "xcode-devicesupport".into(),
+                    title: "iOS device debug symbols".into(),
+                    description: "Symbol files copied from iPhones for on-device debugging, one set per iOS version. Re-copied automatically the next time you debug on the device.".into(),
+                    tier: Tier::Safe,
+                    size_kb: kb,
+                    paths: vec![device_support.to_string_lossy().to_string()],
+                    proof: None,
+                    action: ActionKind::Delete,
+                    command_display: None,
+                });
+            }
+        }
+
+        let sims = home().join("Library/Developer/CoreSimulator/Devices");
+        if sims.exists() {
+            let kb = du_kb(&sims);
+            if kb >= 1024 {
+                out.push(Card {
+                    id: "xcode-simulators".into(),
+                    title: "iOS Simulators".into(),
+                    description: "Simulator devices, each carrying a full OS image. This action only deletes simulators marked unavailable or broken.".into(),
+                    tier: Tier::WithCare,
+                    size_kb: kb,
+                    paths: vec![sims.to_string_lossy().to_string()],
+                    proof: None,
+                    action: ActionKind::Command,
+                    command_display: Some("xcrun simctl delete unavailable".into()),
+                });
             }
         }
     }
-    let sizes = du_many_kb(&derived);
-    let total: u64 = sizes.values().sum();
-    if total >= 1024 {
-        out.push(Card {
-            id: "xcode-derived".into(),
-            title: "Xcode DerivedData".into(),
-            description: "Build caches and indexes. Xcode regenerates them — the first build after cleanup is slower, nothing is lost.".into(),
-            tier: Tier::Safe,
-            size_kb: total,
-            paths: derived.iter().map(|p| p.to_string_lossy().to_string()).collect(),
-            proof: None,
-            action: ActionKind::Delete,
-            command_display: None,
-        });
-    }
 
-    let device_support = xcode.join("iOS DeviceSupport");
-    if device_support.exists() {
-        let kb = du_kb(&device_support);
+    // Linux Yay / AUR Cache
+    let yay_cache = home().join(".cache/yay");
+    if yay_cache.exists() && !is_denied(&yay_cache) {
+        let kb = du_kb(&yay_cache);
         if kb >= 1024 {
             out.push(Card {
-                id: "xcode-devicesupport".into(),
-                title: "iOS device debug symbols".into(),
-                description: "Symbol files copied from iPhones for on-device debugging, one set per iOS version. Re-copied automatically the next time you debug on the device.".into(),
+                id: "yay-cache".into(),
+                title: "Yay / AUR package build cache".into(),
+                description: "Cloned AUR git repositories and built package artifacts in ~/.cache/yay. Safely removed; packages are already installed.".into(),
                 tier: Tier::Safe,
                 size_kb: kb,
-                paths: vec![device_support.to_string_lossy().to_string()],
+                paths: vec![yay_cache.to_string_lossy().to_string()],
                 proof: None,
                 action: ActionKind::Delete,
                 command_display: None,
@@ -328,77 +500,110 @@ fn scan_xcode() -> Vec<Card> {
         }
     }
 
-    let sims = home().join("Library/Developer/CoreSimulator/Devices");
-    if sims.exists() {
-        let kb = du_kb(&sims);
-        if kb >= 1024 {
-            out.push(Card {
-                id: "xcode-simulators".into(),
-                title: "iOS Simulators".into(),
-                description: "Simulator devices, each carrying a full OS image. This action only deletes simulators marked unavailable or broken — erasing a healthy simulator stays a manual call.".into(),
-                tier: Tier::WithCare,
-                size_kb: kb,
-                paths: vec![sims.to_string_lossy().to_string()],
-                proof: None,
-                action: ActionKind::Command,
-                command_display: Some("xcrun simctl delete unavailable".into()),
-            });
-        }
-    }
     out
 }
 
 // ---------------------------------------------------------------- caches
 
 fn scan_caches() -> Vec<Card> {
-    let caches = home().join("Library/Caches");
-    // Counted in their own dedicated cards instead:
-    let excluded = [
-        "Homebrew",
-        "CocoaPods",
-        "ms-playwright",
-        "com.spotify.client",
-        "colima",
-    ];
-    let mut subs: Vec<PathBuf> = vec![];
-    if let Ok(rd) = fs::read_dir(&caches) {
-        for e in rd.flatten() {
-            let Ok(ft) = e.file_type() else { continue };
-            if !ft.is_dir() {
-                continue;
+    let mut out = vec![];
+    let h = home();
+
+    // macOS ~/Library/Caches
+    let mac_caches = h.join("Library/Caches");
+    if mac_caches.exists() {
+        let excluded = [
+            "Homebrew",
+            "CocoaPods",
+            "ms-playwright",
+            "com.spotify.client",
+            "colima",
+        ];
+        let mut subs: Vec<PathBuf> = vec![];
+        if let Ok(rd) = fs::read_dir(&mac_caches) {
+            for e in rd.flatten() {
+                let Ok(ft) = e.file_type() else { continue };
+                if !ft.is_dir() {
+                    continue;
+                }
+                let name = e.file_name().to_string_lossy().to_string();
+                if name.starts_with("com.apple.") || excluded.contains(&name.as_str()) {
+                    continue;
+                }
+                subs.push(e.path());
             }
-            let name = e.file_name().to_string_lossy().to_string();
-            if name.starts_with("com.apple.") || excluded.contains(&name.as_str()) {
-                continue;
-            }
-            subs.push(e.path());
+        }
+        let sizes = du_many_kb(&subs);
+        let mut sized: Vec<(PathBuf, u64)> = subs
+            .into_iter()
+            .map(|p| {
+                let kb = sizes.get(&p).copied().unwrap_or(0);
+                (p, kb)
+            })
+            .filter(|(_, kb)| *kb >= 1024)
+            .collect();
+        sized.sort_by_key(|s| std::cmp::Reverse(s.1));
+        let total: u64 = sized.iter().map(|(_, kb)| kb).sum();
+        if total >= 1024 {
+            out.push(Card {
+                id: "library-caches".into(),
+                title: "App caches (~/Library/Caches)".into(),
+                description: "Per-app scratch data — apps rebuild it as needed. Apple system caches (com.apple.*) are untouched. Folders under 1 MB are skipped.".into(),
+                tier: Tier::Safe,
+                size_kb: total,
+                paths: sized.iter().map(|(p, _)| p.to_string_lossy().to_string()).collect(),
+                proof: None,
+                action: ActionKind::Delete,
+                command_display: None,
+            });
         }
     }
-    let sizes = du_many_kb(&subs);
-    let mut sized: Vec<(PathBuf, u64)> = subs
-        .into_iter()
-        .map(|p| {
-            let kb = sizes.get(&p).copied().unwrap_or(0);
-            (p, kb)
-        })
-        .filter(|(_, kb)| *kb >= 1024)
-        .collect();
-    sized.sort_by_key(|s| std::cmp::Reverse(s.1));
-    let total: u64 = sized.iter().map(|(_, kb)| kb).sum();
-    if total < 1024 {
-        return vec![];
+
+    // Linux XDG ~/.cache
+    let linux_caches = h.join(".cache");
+    if linux_caches.exists() && !mac_caches.exists() {
+        let excluded = ["yay", "ms-playwright", "spotify", "colima", "pnpm", "go-build", "pip", "uv", "pypoetry", "huggingface", "torch"];
+        let mut subs: Vec<PathBuf> = vec![];
+        if let Ok(rd) = fs::read_dir(&linux_caches) {
+            for e in rd.flatten() {
+                let Ok(ft) = e.file_type() else { continue };
+                if !ft.is_dir() {
+                    continue;
+                }
+                let name = e.file_name().to_string_lossy().to_string();
+                if excluded.contains(&name.as_str()) || is_denied(&e.path()) {
+                    continue;
+                }
+                subs.push(e.path());
+            }
+        }
+        let sizes = du_many_kb(&subs);
+        let mut sized: Vec<(PathBuf, u64)> = subs
+            .into_iter()
+            .map(|p| {
+                let kb = sizes.get(&p).copied().unwrap_or(0);
+                (p, kb)
+            })
+            .filter(|(_, kb)| *kb >= 25 * 1024) // 25 MB+
+            .collect();
+        sized.sort_by_key(|s| std::cmp::Reverse(s.1));
+        let total: u64 = sized.iter().map(|(_, kb)| kb).sum();
+        if total >= 1024 {
+            out.push(Card {
+                id: "xdg-cache".into(),
+                title: "User App Caches (~/.cache)".into(),
+                description: "Browser, thumbnail, editor, and application scratch files. Apps rebuild them automatically.".into(),
+                tier: Tier::Safe,
+                size_kb: total,
+                paths: sized.iter().map(|(p, _)| p.to_string_lossy().to_string()).collect(),
+                proof: None,
+                action: ActionKind::Delete,
+                command_display: None,
+            });
+        }
     }
-    vec![Card {
-        id: "library-caches".into(),
-        title: "App caches (~/Library/Caches)".into(),
-        description: "Per-app scratch data — apps rebuild it as needed. Apple system caches (com.apple.*) are deliberately left alone; Homebrew, CocoaPods, Playwright and Spotify are counted in their own cards. Folders under 1 MB are skipped.".into(),
-        tier: Tier::Safe,
-        size_kb: total,
-        paths: sized.iter().map(|(p, _)| p.to_string_lossy().to_string()).collect(),
-        proof: None,
-        action: ActionKind::Delete,
-        command_display: None,
-    }]
+
+    out
 }
 
 // ---------------------------------------------------------------- fixed-path cards
@@ -418,67 +623,80 @@ fn scan_simple() -> Vec<Card> {
             id: "colima",
             title: "colima / Docker VM disk",
             tier: Tier::WithCare,
-            description: "The Docker VM's virtual disk (~/.colima) — often the single biggest hidden item on a dev Mac. Deleting equals `colima delete`: the next `colima start` provisions a fresh VM, and images/containers come back from your Dockerfiles.",
-            candidates: vec![h.join(".colima")],
+            description: "The Docker VM's virtual disk (~/.colima) or local container store — the next `colima start` provisions a fresh VM and images re-pull.",
+            candidates: vec![h.join(".colima"), h.join(".local/share/containers")],
         },
         Spec {
             id: "spotify-cache",
             title: "Spotify cache & downloads",
             tier: Tier::Safe,
-            description: "Streaming cache plus downloaded tracks. Quit Spotify first. It re-caches as you listen; downloads must be re-downloaded in the app.",
+            description: "Streaming cache plus downloaded tracks. It re-caches as you listen; downloads must be re-downloaded in the app.",
             candidates: vec![
                 h.join("Library/Application Support/Spotify/PersistentCache"),
                 h.join("Library/Caches/com.spotify.client"),
+                h.join(".cache/spotify"),
             ],
         },
         Spec {
             id: "claude-vm",
             title: "Claude desktop VM bundle",
             tier: Tier::WithCare,
-            description: "The desktop app's local VM image (vm_bundles). Only used by Claude's local-VM agent mode; it re-provisions itself on next use. Quit Claude before removing.",
-            candidates: vec![h.join("Library/Application Support/Claude/vm_bundles")],
+            description: "The desktop app's local VM image (vm_bundles). Only used by Claude's local-VM agent mode; it re-provisions itself on next use.",
+            candidates: vec![
+                h.join("Library/Application Support/Claude/vm_bundles"),
+                h.join(".config/Claude/vm_bundles"),
+            ],
         },
         Spec {
             id: "iphone-backups",
             title: "iPhone backups (MobileSync)",
             tier: Tier::WithCare,
-            description: "Local device backups. Anything not also in iCloud is gone for good — check Finder → iPhone → Manage Backups first. Always goes to the Trash, never direct delete.",
+            description: "Local device backups. Anything not also in iCloud is gone for good — always goes to the Trash, never direct delete.",
             candidates: vec![h.join("Library/Application Support/MobileSync/Backup")],
         },
         Spec {
             id: "leftovers",
             title: "One-off leftovers",
             tier: Tier::Safe,
-            description: "Dead weight from one-off tools: exam-proctoring runtimes, app-updater caches, VS Code's cached extension installers.",
+            description: "Dead weight from one-off tools: app-updater caches, VS Code's cached extension installers.",
             candidates: vec![
                 h.join("Library/Application Support/OnVUE"),
                 h.join("Library/Application Support/Caches/binance-updater"),
                 h.join("Library/Application Support/Caches/fing-updater"),
                 h.join("Library/Application Support/Code/CachedExtensionVSIXs"),
+                h.join(".config/Code/CachedExtensionVSIXs"),
             ],
         },
         Spec {
             id: "pkg-caches",
-            title: "Package-manager caches",
+            title: "Package-manager caches (npm, pnpm, pip, uv, go, nuget)",
             tier: Tier::Safe,
-            description: "npm, pnpm, NuGet, CocoaPods, Go module and Playwright browser caches. Everything re-downloads on demand the next time you build.",
+            description: "npm, pnpm, NuGet, Pip, UV, Poetry, HuggingFace, Go module and Playwright caches. Everything re-downloads on demand when building.",
             candidates: vec![
                 h.join(".npm/_cacache"),
                 h.join("Library/pnpm/store"),
                 h.join(".local/share/pnpm/store"),
                 h.join(".local/share/NuGet"),
                 h.join("Library/Caches/ms-playwright"),
+                h.join(".cache/ms-playwright"),
                 h.join("Library/Caches/CocoaPods"),
                 h.join("Library/Caches/colima"),
                 h.join("go/pkg/mod"),
+                h.join(".cache/go-build"),
+                h.join(".cache/pip"),
+                h.join(".cache/uv"),
+                h.join(".cache/pypoetry/cache"),
+                h.join(".cache/pypoetry/artifacts"),
+                h.join(".cache/huggingface/hub"),
+                h.join(".cargo/registry/cache"),
             ],
         },
         Spec {
             id: "trash",
-            title: "Finder Trash",
+            title: "Trash",
             tier: Tier::Safe,
-            description: "Files already sitting in the Trash — including anything this app moved there. Emptying is the one delete that can't go to the Trash again.",
-            candidates: vec![h.join(".Trash")],
+            description: "Files already sitting in the Trash — including anything this app moved there. Emptying frees disk space permanently.",
+            candidates: vec![h.join(".Trash"), h.join(".local/share/Trash")],
         },
     ];
 
@@ -522,7 +740,7 @@ fn scan_simple() -> Vec<Card> {
 }
 
 fn list_backups(dir: &Path) -> String {
-    let now = std::time::SystemTime::now();
+    let now = SystemTime::now();
     let mut lines = vec![];
     if let Ok(rd) = fs::read_dir(dir) {
         for e in rd.flatten() {
@@ -548,11 +766,175 @@ fn list_backups(dir: &Path) -> String {
     }
 }
 
+// ---------------------------------------------------------------- stale downloads (>30 days)
+
+fn scan_stale_downloads() -> Vec<Card> {
+    let downloads = home().join("Downloads");
+    if !downloads.is_dir() || is_denied(&downloads) {
+        return vec![];
+    }
+
+    let now = SystemTime::now();
+    let mut stale_paths = vec![];
+
+    if let Ok(rd) = fs::read_dir(&downloads) {
+        for entry in rd.flatten() {
+            let path = entry.path();
+            if is_denied(&path) {
+                continue;
+            }
+            if let Ok(meta) = entry.metadata() {
+                if let Ok(modified) = meta.modified() {
+                    if let Ok(duration) = now.duration_since(modified) {
+                        let age_days = duration.as_secs() / 86400;
+                        if age_days >= 30 {
+                            stale_paths.push(path);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if stale_paths.is_empty() {
+        return vec![];
+    }
+
+    let sizes = du_many_kb(&stale_paths);
+    let mut sized: Vec<(PathBuf, u64)> = stale_paths
+        .into_iter()
+        .map(|p| {
+            let kb = sizes.get(&p).copied().unwrap_or(0);
+            (p, kb)
+        })
+        .filter(|(_, kb)| *kb >= 25 * 1024) // 25 MB+
+        .collect();
+
+    sized.sort_by_key(|s| std::cmp::Reverse(s.1));
+    let total: u64 = sized.iter().map(|(_, kb)| kb).sum();
+    if total < 25 * 1024 {
+        return vec![];
+    }
+
+    vec![Card {
+        id: "stale-downloads".into(),
+        title: "Stale large downloads (>30 days untouched in ~/Downloads)".into(),
+        description: "Old installers, iso images, and downloaded archives that have not been modified in over 30 days. Review before removing.".into(),
+        tier: Tier::WithCare,
+        size_kb: total,
+        paths: sized.iter().map(|(p, _)| p.to_string_lossy().to_string()).collect(),
+        proof: None,
+        action: ActionKind::Delete,
+        command_display: None,
+    }]
+}
+
 // ---------------------------------------------------------------- command & info cards
 
 fn scan_commands() -> Vec<Card> {
     let mut out = vec![];
 
+    // Linux: Pacman Package Cache (/var/cache/pacman/pkg)
+    let pacman_cache = Path::new("/var/cache/pacman/pkg");
+    if pacman_cache.exists() {
+        let kb = du_kb(pacman_cache);
+        if kb >= 1024 {
+            out.push(Card {
+                id: "pacman-cache".into(),
+                title: "Pacman package cache (/var/cache/pacman/pkg)".into(),
+                description: "Arch Linux downloaded package archives. Cleaning removes uninstalled and older versions while retaining installed packages.".into(),
+                tier: Tier::Safe,
+                size_kb: kb,
+                paths: vec![pacman_cache.to_string_lossy().to_string()],
+                proof: None,
+                action: ActionKind::Command,
+                command_display: Some("sudo paccache -rk2".into()),
+            });
+        }
+    }
+
+    // Linux: Systemd Journal Logs
+    let journal_dir = Path::new("/var/log/journal");
+    if journal_dir.exists() {
+        let kb = du_kb(journal_dir);
+        if kb >= 1024 {
+            out.push(Card {
+                id: "journal-logs".into(),
+                title: "Systemd journal logs (/var/log/journal)".into(),
+                description: "Arch Linux system logs. Vacuuming retains the latest 200 MB of logs and frees the rest.".into(),
+                tier: Tier::WithCare,
+                size_kb: kb,
+                paths: vec![journal_dir.to_string_lossy().to_string()],
+                proof: None,
+                action: ActionKind::Command,
+                command_display: Some("sudo journalctl --vacuum-size=200M".into()),
+            });
+        }
+    }
+
+    // Linux: Systemd Crash Coredumps (/var/lib/systemd/coredump)
+    let coredump_dir = Path::new("/var/lib/systemd/coredump");
+    if coredump_dir.exists() {
+        let kb = du_kb(coredump_dir);
+        if kb >= 1024 {
+            out.push(Card {
+                id: "coredump-logs".into(),
+                title: "Systemd crash coredumps (/var/lib/systemd/coredump)".into(),
+                description: "Stored crash dumps from aborted processes. Vacuuming removes old crash dumps while keeping recent reports.".into(),
+                tier: Tier::Safe,
+                size_kb: kb,
+                paths: vec![coredump_dir.to_string_lossy().to_string()],
+                proof: None,
+                action: ActionKind::Command,
+                command_display: Some("sudo coredumpctl vacuum --size=50M".into()),
+            });
+        }
+    }
+
+    // Linux: Flatpak unused runtimes
+    if let Ok(out_flatpak) = Command::new("flatpak").args(["list", "--unused"]).output() {
+        if out_flatpak.status.success() && !out_flatpak.stdout.is_empty() {
+            let text = String::from_utf8_lossy(&out_flatpak.stdout);
+            let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
+            if !lines.is_empty() {
+                out.push(Card {
+                    id: "flatpak-unused".into(),
+                    title: format!("Unused Flatpak runtimes ({} found)", lines.len()),
+                    description: "Old Flatpak runtimes no longer required by any installed application.".into(),
+                    tier: Tier::Safe,
+                    size_kb: 0,
+                    paths: vec![],
+                    proof: Some(lines.join("\n")),
+                    action: ActionKind::Command,
+                    command_display: Some("flatpak uninstall --unused -y".into()),
+                });
+            }
+        }
+    }
+
+    // Docker / Podman prune
+    if let Ok(out_docker) = Command::new("docker").args(["system", "df"]).output() {
+        if out_docker.status.success() {
+            let text = String::from_utf8_lossy(&out_docker.stdout);
+            // Parse reclaimable column if any
+            let has_reclaimable = text.lines().any(|l| l.contains("GB") || l.contains("MB"));
+            if has_reclaimable && !text.contains("0B        0B") {
+                out.push(Card {
+                    id: "docker-prune".into(),
+                    title: "Docker unused containers, images & build cache".into(),
+                    description: "Dangling Docker images, stopped build containers, and build cache. Runs `docker system prune -f`.".into(),
+                    tier: Tier::WithCare,
+                    size_kb: 0,
+                    paths: vec![],
+                    proof: Some(text.trim().to_string()),
+                    action: ActionKind::Command,
+                    command_display: Some("docker system prune -f".into()),
+                });
+            }
+        }
+    }
+
+    // macOS: Homebrew
     let brew_cache = home().join("Library/Caches/Homebrew");
     if brew_cache.exists() {
         let kb = du_kb(&brew_cache);
@@ -571,7 +953,9 @@ fn scan_commands() -> Vec<Card> {
         }
     }
 
-    if let Ok(out_snap) = Command::new("/usr/bin/tmutil")
+    // macOS: Time Machine
+    #[cfg(target_os = "macos")]
+    if let Ok(out_snap) = Command::new("tmutil")
         .args(["listlocalsnapshots", "/"])
         .output()
     {
@@ -596,13 +980,14 @@ fn scan_commands() -> Vec<Card> {
         }
     }
 
+    // macOS: Staged Update
     let update_vol = Path::new("/System/Volumes/Update");
     if update_vol.exists() {
-        let kb = du_kb(update_vol); // best-effort; undercounts without root
+        let kb = du_kb(update_vol);
         out.push(Card {
             id: "os-update".into(),
             title: "Staged macOS update".into(),
-            description: "Staged system updates and Preboot bloat can pin 20+ GB that Settings files under \"System Data\". The only fix is finishing the update: System Settings → General → Software Update, then restart. Nothing here to click.".into(),
+            description: "Staged system updates and Preboot bloat can pin 20+ GB. The only fix is finishing the update in System Settings → Software Update. Nothing here to click.".into(),
             tier: Tier::Manual,
             size_kb: kb,
             paths: vec!["/System/Volumes/Update".into()],
@@ -611,5 +996,6 @@ fn scan_commands() -> Vec<Card> {
             command_display: None,
         });
     }
+
     out
 }

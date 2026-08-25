@@ -36,56 +36,90 @@ pub struct GoogleState(pub Mutex<Option<CachedToken>>);
 
 // ---------------------------------------------------------------- keychain
 
+fn creds_file_path() -> std::path::PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+    std::path::PathBuf::from(home).join(".config/alpheus/google_credentials.json")
+}
+
 fn keychain_read() -> Option<StoredCreds> {
-    let out = Command::new("/usr/bin/security")
-        .args([
-            "find-generic-password",
-            "-s",
-            KEYCHAIN_SERVICE,
-            "-a",
-            KEYCHAIN_ACCOUNT,
-            "-w",
-        ])
-        .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
+    #[cfg(target_os = "macos")]
+    {
+        let out = Command::new("/usr/bin/security")
+            .args([
+                "find-generic-password",
+                "-s",
+                KEYCHAIN_SERVICE,
+                "-a",
+                KEYCHAIN_ACCOUNT,
+                "-w",
+            ])
+            .output()
+            .ok()?;
+        if out.status.success() {
+            if let Ok(c) = serde_json::from_str(String::from_utf8_lossy(&out.stdout).trim()) {
+                return Some(c);
+            }
+        }
     }
-    serde_json::from_str(String::from_utf8_lossy(&out.stdout).trim()).ok()
+    let p = creds_file_path();
+    if p.exists() {
+        let content = std::fs::read_to_string(&p).ok()?;
+        return serde_json::from_str(&content).ok();
+    }
+    None
 }
 
 fn keychain_write(creds: &StoredCreds) -> Result<(), String> {
-    let json = serde_json::to_string(creds).map_err(|e| e.to_string())?;
-    let out = Command::new("/usr/bin/security")
-        .args([
-            "add-generic-password",
-            "-U",
-            "-s",
-            KEYCHAIN_SERVICE,
-            "-a",
-            KEYCHAIN_ACCOUNT,
-            "-w",
-            &json,
-        ])
-        .output()
-        .map_err(|e| e.to_string())?;
-    if out.status.success() {
-        Ok(())
-    } else {
-        Err("could not store the credentials in the Keychain".into())
+    #[cfg(target_os = "macos")]
+    {
+        let json = serde_json::to_string(creds).map_err(|e| e.to_string())?;
+        if let Ok(out) = Command::new("/usr/bin/security")
+            .args([
+                "add-generic-password",
+                "-U",
+                "-s",
+                KEYCHAIN_SERVICE,
+                "-a",
+                KEYCHAIN_ACCOUNT,
+                "-w",
+                &json,
+            ])
+            .output()
+        {
+            if out.status.success() {
+                return Ok(());
+            }
+        }
     }
+    let p = creds_file_path();
+    if let Some(parent) = p.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let json = serde_json::to_string_pretty(creds).map_err(|e| e.to_string())?;
+    std::fs::write(&p, json).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600));
+    }
+    Ok(())
 }
 
 fn keychain_delete() {
-    let _ = Command::new("/usr/bin/security")
-        .args([
-            "delete-generic-password",
-            "-s",
-            KEYCHAIN_SERVICE,
-            "-a",
-            KEYCHAIN_ACCOUNT,
-        ])
-        .output();
+    #[cfg(target_os = "macos")]
+    {
+        let _ = Command::new("/usr/bin/security")
+            .args([
+                "delete-generic-password",
+                "-s",
+                KEYCHAIN_SERVICE,
+                "-a",
+                KEYCHAIN_ACCOUNT,
+            ])
+            .output();
+    }
+    let p = creds_file_path();
+    let _ = std::fs::remove_file(p);
 }
 
 // ---------------------------------------------------------------- helpers

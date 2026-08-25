@@ -6,22 +6,33 @@ pub struct DiskUsage {
     pub free_kb: u64,
 }
 
-/// Root-volume usage via `df -k /` — zero extra dependencies.
+/// Root/Home-volume usage via `df -k` — zero extra dependencies.
 pub fn usage() -> DiskUsage {
-    if let Ok(out) = Command::new("/bin/df").args(["-k", "/"]).output() {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/".into());
+    let try_df = |path: &str| -> Option<DiskUsage> {
+        let out = Command::new("df")
+            .args(["-k", path])
+            .output()
+            .or_else(|_| Command::new("/bin/df").args(["-k", path]).output())
+            .or_else(|_| Command::new("/usr/bin/df").args(["-k", path]).output())
+            .ok()?;
         let text = String::from_utf8_lossy(&out.stdout);
-        if let Some(line) = text.lines().nth(1) {
-            let fields: Vec<&str> = line.split_whitespace().collect();
-            if fields.len() >= 4 {
-                return DiskUsage {
-                    total_kb: fields[1].parse().unwrap_or(0),
-                    free_kb: fields[3].parse().unwrap_or(0),
-                };
-            }
+        let line = text.lines().nth(1)?;
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        if fields.len() >= 4 {
+            Some(DiskUsage {
+                total_kb: fields[1].parse().unwrap_or(0),
+                free_kb: fields[3].parse().unwrap_or(0),
+            })
+        } else {
+            None
         }
-    }
-    DiskUsage {
-        total_kb: 0,
-        free_kb: 0,
-    }
+    };
+
+    try_df(&home)
+        .or_else(|| try_df("/"))
+        .unwrap_or(DiskUsage {
+            total_kb: 0,
+            free_kb: 0,
+        })
 }

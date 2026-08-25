@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-linux-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libayatana-appindicator3-dev
+
+      - name: Build Linux release binary
+        run: cargo build --release --bin alpheus
+        working-directory: src-tauri
+
+      - name: Package Linux release archive
+        run: |
+          mkdir -p dist/alpheus-linux-x86_64
+          cp src-tauri/target/release/alpheus dist/alpheus-linux-x86_64/
+          cp alpheus.desktop dist/alpheus-linux-x86_64/
+          cp -r plugins/omarchy.alpheus dist/alpheus-linux-x86_64/
+          cp scripts/install.sh dist/alpheus-linux-x86_64/
+          cp README.md LICENSE dist/alpheus-linux-x86_64/
+          cd dist
+          tar -czvf alpheus-linux-x86_64.tar.gz alpheus-linux-x86_64
+
+      - name: Upload Linux Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/alpheus-linux-x86_64.tar.gz
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Frontend build
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build macOS CLI binary
+        run: cargo build --release --bin alpheus
+        working-directory: src-tauri
+
+      - name: Package macOS CLI
+        run: |
+          mkdir -p dist/alpheus-macos
+          cp src-tauri/target/release/alpheus dist/alpheus-macos/
+          cp README.md LICENSE dist/alpheus-macos/
+          cd dist
+          tar -czvf alpheus-macos.tar.gz alpheus-macos
+
+      - name: Upload macOS Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/alpheus-macos.tar.gz

@@ -4,12 +4,15 @@
 //! methods all come from the last scan held in [`ScanState`], so a compromised
 //! or buggy webview cannot ask the backend to delete arbitrary paths.
 
-mod disk;
-mod exec;
-mod google;
-mod history;
-mod scan;
-mod settings;
+pub mod analyze;
+pub mod disk;
+pub mod dupes;
+pub mod exec;
+pub mod google;
+pub mod history;
+pub mod scan;
+pub mod settings;
+pub mod snapshot;
 
 use std::collections::HashMap;
 use std::sync::Mutex;

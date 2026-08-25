@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Alpheus
+GenericName=Storage Manager & Cleaner
+Comment=Interactive storage manager, deep build cache cleaner, and disk monitor
+Exec=alpheus -i
+Icon=alpheus
+Terminal=true
+Type=Application
+Categories=System;Utility;
+Keywords=disk;storage;cleaner;cleanup;trash;cache;space;
+StartupNotify=false
