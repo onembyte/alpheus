@@ -15,7 +15,9 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::State;
 
+#[cfg(target_os = "macos")]
 const KEYCHAIN_SERVICE: &str = "com.francomichetti.storage-manager.google";
+#[cfg(target_os = "macos")]
 const KEYCHAIN_ACCOUNT: &str = "oauth";
 const SCOPE: &str = "https://www.googleapis.com/auth/drive";
 
