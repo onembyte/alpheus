@@ -37,8 +37,14 @@ if [ -f "$HOME/.config/omarchy/shell.json" ]; then
     if command -v jq >/dev/null 2>&1; then
         TMP_JSON="$(mktemp /tmp/shell-clean.XXXXXX.json)"
         jq '
-          (.bar.layout.right // []) |= map(select(.id != "alpheus" and .id != "omarchy.alpheus")) |
-          (.plugins // []) |= map(select(. != "alpheus" and . != "omarchy.alpheus"))
+          if .bar?.layout? then
+            .bar.layout.left = ((.bar.layout.left // []) | map(select(.id != "alpheus" and .id != "omarchy.alpheus"))) |
+            .bar.layout.center = ((.bar.layout.center // []) | map(select(.id != "alpheus" and .id != "omarchy.alpheus"))) |
+            .bar.layout.right = ((.bar.layout.right // []) | map(select(.id != "alpheus" and .id != "omarchy.alpheus")))
+          else . end |
+          if .plugins? then
+            .plugins = ((.plugins // []) | map(select(. != "alpheus" and . != "omarchy.alpheus" and .id? != "alpheus" and .id? != "omarchy.alpheus")))
+          else . end
         ' "$HOME/.config/omarchy/shell.json" > "$TMP_JSON" 2>/dev/null && mv "$TMP_JSON" "$HOME/.config/omarchy/shell.json"
     fi
 fi

@@ -662,10 +662,42 @@ fn run_uninstall(auto_yes: bool) {
             .output();
     }
 
-    // 2. Remove Omarchy plugin
+    // 2. Remove Omarchy plugin & clean shell.json
     let h = scan::home();
     let _ = fs::remove_dir_all(h.join(".config/omarchy/plugins/alpheus"));
     let _ = fs::remove_dir_all(h.join(".config/omarchy/plugins/omarchy.alpheus"));
+
+    let shell_json_path = h.join(".config/omarchy/shell.json");
+    if shell_json_path.exists() {
+        if let Ok(content) = fs::read_to_string(&shell_json_path) {
+            if let Ok(mut val) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(bar) = val.get_mut("bar").and_then(|b| b.get_mut("layout")) {
+                    for section in ["left", "center", "right"] {
+                        if let Some(arr) = bar.get_mut(section).and_then(|s| s.as_array_mut()) {
+                            arr.retain(|item| {
+                                let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                                id != "alpheus" && id != "omarchy.alpheus"
+                            });
+                        }
+                    }
+                }
+                if let Some(plugins) = val.get_mut("plugins").and_then(|p| p.as_array_mut()) {
+                    plugins.retain(|item| {
+                        let id = if let Some(s) = item.as_str() {
+                            s
+                        } else {
+                            item.get("id").and_then(|v| v.as_str()).unwrap_or("")
+                        };
+                        id != "alpheus" && id != "omarchy.alpheus"
+                    });
+                }
+                if let Ok(serialized) = serde_json::to_string_pretty(&val) {
+                    let _ = fs::write(&shell_json_path, serialized);
+                }
+            }
+        }
+    }
+
     let _ = Command::new("omarchy-shell")
         .args(["shell", "rescanPlugins"])
         .output();
