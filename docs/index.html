@@ -269,15 +269,20 @@
         <td class="cmd">alpheus update</td>
         <td class="desc">Update Alpheus CLI binary in-place to the latest release</td>
       </tr>
+      <tr>
+        <td class="cmd">alpheus uninstall</td>
+        <td class="desc">Completely and cleanly remove Alpheus, shell completions, and widget</td>
+      </tr>
     </tbody>
   </table>
 
   <div class="section-title">INTEGRATION</div>
 
   <div class="platforms">
-    • <strong>Omarchy OS:</strong> Top-bar Quickshell widget automatically deployed to <code>~/.config/omarchy/plugins/omarchy.alpheus</code>.<br>
+    • <strong>Omarchy OS:</strong> Top-bar Quickshell widget automatically deployed to <code>~/.config/omarchy/plugins/alpheus</code>.<br>
     • <strong>Completions:</strong> Native auto-completions generated for <code>bash</code>, <code>zsh</code>, and <code>fish</code>.<br>
-    • <strong>Safety:</strong> Strict denylist isolation outside <code>$HOME</code> + 5 GB Trash threshold rule.
+    • <strong>Safety:</strong> Strict denylist isolation outside <code>$HOME</code> + 5 GB Trash threshold rule.<br>
+    • <strong>Clean Uninstall:</strong> Run <code>alpheus uninstall</code> or <code>curl -fsSL https://onembyte.github.io/alpheus/uninstall.sh | bash</code>.
   </div>
 
   <footer>

@@ -6,7 +6,7 @@ import qs.Ui
 
 BarWidget {
   id: root
-  moduleName: "omarchy.alpheus"
+  moduleName: "alpheus"
 
   property string freeFormatted: "…"
   property string totalFormatted: "…"
@@ -101,46 +101,36 @@ BarWidget {
       waitForEnd: true
       onStreamFinished: {
         root.lastCleanMessage = text
+        root.refresh()
       }
-    }
-    onExited: function(code) {
-      root.refresh()
     }
   }
 
   Timer {
-    id: pollTimer
-    interval: 60000 // Poll every 60s
-    repeat: true
+    interval: 60000
     running: true
+    repeat: true
+    triggeredOnStart: true
     onTriggered: root.refresh()
-  }
-
-  Component.onCompleted: {
-    root.refresh()
   }
 
   WidgetButton {
     id: button
     bar: root.bar
-    text: "󰋊 " + root.freeFormatted
+    iconName: "drive-harddisk-symbolic"
+    text: root.freeFormatted
+    badge: (root.statusData && root.statusData.summary && root.statusData.summary.reclaimable_kb > 1024 * 1024) ? "!" : ""
     tooltipText: "Alpheus Storage: " + root.freeFormatted + " free (" + root.reclaimableFormatted + " reclaimable)"
-    active: root.opened
-    foreground: root.freePct < 10.0 ? (bar ? bar.urgent : Color.urgent) : (bar ? bar.barForeground : Color.foreground)
-
-    onPressed: function(btn) {
-      if (btn === Qt.RightButton) {
-        Quickshell.execDetached(["alpheus", "scan"])
-      } else {
-        root.togglePanel()
-      }
-    }
+    onClicked: root.togglePanel()
   }
 
   Loader {
     id: panelLoader
     active: true
     source: "Panel.qml"
-    onLoaded: root.injectPanel()
+    onLoaded: {
+      root.injectPanel()
+      root.refresh()
+    }
   }
 }

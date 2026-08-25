@@ -117,16 +117,21 @@ fi
 # 5. Omarchy OS Integration
 if [ -d "/usr/share/omarchy/shell" ] || [ -f "/etc/omarchy/version" ] || [ -d "$HOME/.config/omarchy" ]; then
     echo -e "  Detected ${BOLD}Omarchy OS${RESET} environment."
-    PLUGIN_DIR="$HOME/.config/omarchy/plugins/omarchy.alpheus"
+    PLUGIN_DIR="$HOME/.config/omarchy/plugins/alpheus"
     mkdir -p "$PLUGIN_DIR"
 
     # Try local plugin folder first, or fetch from GitHub
-    if [ -d "$SCRIPT_DIR/../plugins/omarchy.alpheus" ]; then
-        cp -r "$SCRIPT_DIR/../plugins/omarchy.alpheus/"* "$PLUGIN_DIR/"
+    if [ -d "$SCRIPT_DIR/../plugins/alpheus" ]; then
+        cp -r "$SCRIPT_DIR/../plugins/alpheus/"* "$PLUGIN_DIR/"
     else
-        curl -fsSL "${GITHUB_RAW}/plugins/omarchy.alpheus/manifest.json" -o "$PLUGIN_DIR/manifest.json" 2>/dev/null || true
-        curl -fsSL "${GITHUB_RAW}/plugins/omarchy.alpheus/BarWidget.qml" -o "$PLUGIN_DIR/BarWidget.qml" 2>/dev/null || true
-        curl -fsSL "${GITHUB_RAW}/plugins/omarchy.alpheus/Panel.qml" -o "$PLUGIN_DIR/Panel.qml" 2>/dev/null || true
+        curl -fsSL "${GITHUB_RAW}/plugins/alpheus/manifest.json" -o "$PLUGIN_DIR/manifest.json" 2>/dev/null || true
+        curl -fsSL "${GITHUB_RAW}/plugins/alpheus/BarWidget.qml" -o "$PLUGIN_DIR/BarWidget.qml" 2>/dev/null || true
+        curl -fsSL "${GITHUB_RAW}/plugins/alpheus/Panel.qml" -o "$PLUGIN_DIR/Panel.qml" 2>/dev/null || true
+    fi
+
+    # Trigger hot-reload in Omarchy shell
+    if command -v omarchy-shell >/dev/null 2>&1; then
+        omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true
     fi
     echo -e "  ${GREEN}✔ Installed Omarchy Quickshell top-bar widget to:${RESET} $PLUGIN_DIR"
 fi

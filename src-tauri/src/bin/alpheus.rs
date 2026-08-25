@@ -48,6 +48,7 @@ fn print_help() {
     println!("  watch [--pct N]   Monitor disk space and notify when free space drops below N%");
     println!("  schedule          Manage background automatic cleanup timers (systemd / launchd)");
     println!("  update            Update Alpheus CLI binary to the latest version");
+    println!("  uninstall [-y]    Completely uninstall Alpheus, completions, and widget");
     println!("  completion <sh>   Generate shell auto-completions (bash, zsh, fish)");
     println!("  history           Display the log of previous cleanup actions");
     println!("  help, -h, --help  Print this help message");
@@ -60,7 +61,7 @@ fn print_help() {
     println!("  alpheus dupes ~/Downloads # Find duplicate files in Downloads");
     println!("  alpheus diff ~            # Track disk growth since last snapshot");
     println!("  alpheus clean --all-safe  # Safely wipe build caches and packages");
-    println!("  alpheus update            # Update Alpheus to latest release");
+    println!("  alpheus uninstall         # Clean uninstall");
 }
 
 fn fmt_kb(kb: u64) -> String {
@@ -577,7 +578,6 @@ fn run_watch(threshold_pct: f64) {
 
         if free_pct < threshold_pct {
             let now = now_secs();
-            // Alert at most once every 10 minutes
             if now - last_alert_secs >= 600 {
                 last_alert_secs = now;
                 let title = "Alpheus: Low Disk Space Warning";
@@ -613,7 +613,7 @@ fn run_watch(threshold_pct: f64) {
     }
 }
 
-// ---------------------------------------------------------------- Auto-Updater
+// ---------------------------------------------------------------- Auto-Updater & Clean Uninstaller
 
 fn run_update() {
     println!("\x1b[1mChecking for Alpheus updates from GitHub...\x1b[0m");
@@ -635,6 +635,63 @@ fn run_update() {
     }
 }
 
+fn run_uninstall(auto_yes: bool) {
+    if !auto_yes {
+        print!("Are you sure you want to completely uninstall Alpheus? [y/N]: ");
+        let _ = io::stdout().flush();
+        let mut input = String::new();
+        if io::stdin().read_line(&mut input).is_err() || !input.trim().eq_ignore_ascii_case("y") {
+            println!("Uninstall aborted.");
+            return;
+        }
+    }
+
+    println!("Uninstalling Alpheus...");
+
+    // 1. Disable systemd timer
+    #[cfg(target_os = "linux")]
+    {
+        let _ = Command::new("systemctl")
+            .args(["--user", "disable", "--now", "alpheus-clean.timer"])
+            .output();
+        let user_sys = scan::home().join(".config/systemd/user");
+        let _ = fs::remove_file(user_sys.join("alpheus-clean.service"));
+        let _ = fs::remove_file(user_sys.join("alpheus-clean.timer"));
+        let _ = Command::new("systemctl")
+            .args(["--user", "daemon-reload"])
+            .output();
+    }
+
+    // 2. Remove Omarchy plugin
+    let h = scan::home();
+    let _ = fs::remove_dir_all(h.join(".config/omarchy/plugins/alpheus"));
+    let _ = fs::remove_dir_all(h.join(".config/omarchy/plugins/omarchy.alpheus"));
+    let _ = Command::new("omarchy-shell")
+        .args(["shell", "rescanPlugins"])
+        .output();
+
+    // 3. Remove desktop files & icons
+    let _ = fs::remove_file(h.join(".local/share/applications/alpheus.desktop"));
+    let _ = fs::remove_file(h.join(".local/share/icons/hicolor/128x128/apps/alpheus.png"));
+
+    // 4. Remove shell completions
+    let _ = fs::remove_file(h.join(".local/share/bash-completion/completions/alpheus"));
+    let _ = fs::remove_file(h.join(".zsh/completions/_alpheus"));
+    let _ = fs::remove_file(h.join(".config/fish/completions/alpheus.fish"));
+
+    // 5. Remove data directories
+    let _ = fs::remove_dir_all(h.join(".local/share/alpheus"));
+    let _ = fs::remove_dir_all(h.join(".config/alpheus"));
+
+    // 6. Remove self binary
+    if let Ok(exe) = env::current_exe() {
+        let _ = fs::remove_file(exe);
+    }
+    let _ = fs::remove_file(h.join(".local/bin/alpheus"));
+
+    println!("\x1b[32m✔ Alpheus has been cleanly and completely uninstalled.\x1b[0m");
+}
+
 // ---------------------------------------------------------------- Shell Completions
 
 fn run_completion(shell: &str) {
@@ -647,7 +704,7 @@ fn run_completion(shell: &str) {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    opts="scan interactive browse status dry-run clean schedule history top dupes snapshot diff watch update help"
+    opts="scan interactive browse status dry-run clean schedule history top dupes snapshot diff watch update uninstall help"
 
     case "$prev" in
         clean|dry-run)
@@ -694,6 +751,7 @@ _alpheus() {
         'watch:Low-disk space alert daemon'
         'schedule:Manage automatic background timer'
         'update:Self-update Alpheus'
+        'uninstall:Cleanly remove Alpheus'
         'history:View action log'
         'completion:Generate shell completions'
     )
@@ -720,6 +778,7 @@ complete -c alpheus -f -a "diff" -d "Compare growth against snapshot"
 complete -c alpheus -f -a "watch" -d "Low-disk space alert daemon"
 complete -c alpheus -f -a "schedule" -d "Manage automatic background timer"
 complete -c alpheus -f -a "update" -d "Self-update Alpheus"
+complete -c alpheus -f -a "uninstall" -d "Cleanly remove Alpheus"
 complete -c alpheus -f -a "history" -d "View action log"
 "#
             );
@@ -1167,6 +1226,11 @@ fn main() {
             }
             "update" => {
                 run_update();
+                return;
+            }
+            "uninstall" => {
+                let auto_yes = args.contains(&"-y".to_string()) || args.contains(&"--yes".to_string());
+                run_uninstall(auto_yes);
                 return;
             }
             "completion" => {

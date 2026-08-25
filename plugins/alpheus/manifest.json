@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "id": "omarchy.alpheus",
+  "id": "alpheus",
   "name": "Alpheus Storage",
   "version": "0.8.0",
   "author": "Franco Michetti",
@@ -17,9 +17,6 @@
     "description": "Disk space monitor & cleaner",
     "category": "System",
     "allowMultiple": false,
-    "defaultSection": "right",
-    "defaults": {
-      "refreshIntervalSec": 60
-    }
+    "defaultSection": "right"
   }
 }
