@@ -16,7 +16,7 @@ jobs:
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libayatana-appindicator3-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Build Linux release binary
         run: cargo build --release --bin alpheus
@@ -27,7 +27,7 @@ jobs:
           mkdir -p dist/alpheus-linux-x86_64
           cp src-tauri/target/release/alpheus dist/alpheus-linux-x86_64/
           cp alpheus.desktop dist/alpheus-linux-x86_64/
-          cp -r plugins/omarchy.alpheus dist/alpheus-linux-x86_64/
+          cp -r plugins/alpheus dist/alpheus-linux-x86_64/
           cp scripts/install.sh dist/alpheus-linux-x86_64/
           cp README.md LICENSE dist/alpheus-linux-x86_64/
           cd dist
@@ -52,7 +52,7 @@ jobs:
 
       - name: Frontend build
         run: |
-          pnpm install --frozen-lockfile
+          pnpm install
           pnpm build
 
       - uses: dtolnay/rust-toolchain@stable
