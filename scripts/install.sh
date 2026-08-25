@@ -128,9 +128,25 @@ if [ -d "/usr/share/omarchy/shell" ] || [ -f "/etc/omarchy/version" ] || [ -d "$
         curl -fsSL "${GITHUB_RAW}/plugins/alpheus/Panel.qml" -o "$PLUGIN_DIR/Panel.qml" 2>/dev/null || true
     fi
 
+    # Register widget in Omarchy shell.json if not present
+    if [ -f "$HOME/.config/omarchy/shell.json" ]; then
+        if command -v jq >/dev/null 2>&1; then
+            TMP_JSON="$(mktemp /tmp/shell-add.XXXXXX.json)"
+            jq '
+              if (.bar.layout.right // []) | map(.id) | index("alpheus") | not then
+                .bar.layout.right += [{"id": "alpheus"}]
+              else . end |
+              if (.plugins // []) | index("alpheus") | not then
+                .plugins += ["alpheus"]
+              else . end
+            ' "$HOME/.config/omarchy/shell.json" > "$TMP_JSON" 2>/dev/null && mv "$TMP_JSON" "$HOME/.config/omarchy/shell.json"
+        fi
+    fi
+
     # Trigger hot-reload in Omarchy shell
     if command -v omarchy-shell >/dev/null 2>&1; then
         omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true
+        omarchy-shell shell putBarWidget alpheus '{"section":"right"}' >/dev/null 2>&1 || true
     fi
     echo -e "  ${GREEN}✔ Installed Omarchy Quickshell top-bar widget to:${RESET} $PLUGIN_DIR"
 fi
