@@ -125,7 +125,6 @@ if [ -d "/usr/share/omarchy/shell" ] || [ -f "/etc/omarchy/version" ] || [ -d "$
         cp -r "$SCRIPT_DIR/../plugins/alpheus/"* "$PLUGIN_DIR/"
     else
         curl -fsSL "${GITHUB_RAW}/plugins/alpheus/manifest.json" -o "$PLUGIN_DIR/manifest.json" 2>/dev/null || true
-        curl -fsSL "${GITHUB_RAW}/plugins/alpheus/BarWidget.qml" -o "$PLUGIN_DIR/BarWidget.qml" 2>/dev/null || true
         curl -fsSL "${GITHUB_RAW}/plugins/alpheus/Panel.qml" -o "$PLUGIN_DIR/Panel.qml" 2>/dev/null || true
     fi
 

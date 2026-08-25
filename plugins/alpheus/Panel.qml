@@ -8,241 +8,279 @@ import qs.Ui
 
 Panel {
   id: root
-  moduleName: "omarchy.alpheus"
-  ipcTarget: "omarchy.alpheus"
-  manageIpc: false
+  moduleName: "alpheus"
+  ipcTarget: "alpheus"
+  manageIpc: true
 
-  property var hostWidget: null
-  property var anchorItem: null
+  property string freeFormatted: "…"
+  property string totalFormatted: "…"
+  property real freePct: 100
+  property real usedPct: 0
+  property string reclaimableFormatted: "0 MB"
+  property string safeFormatted: "0 MB"
   property var statusData: null
-  property bool isScanning: false
-  readonly property var barIdentity: hostWidget || root
+  property bool isScanning: statusProc.running || cleanProc.running
 
   readonly property var disk: statusData ? statusData.disk : null
   readonly property var summary: statusData ? statusData.summary : null
   readonly property var cards: statusData && statusData.cards ? statusData.cards : []
 
-  readonly property string freeFormatted: disk ? (disk.free_formatted || "…") : "…"
-  readonly property string totalFormatted: disk ? (disk.total_formatted || "…") : "…"
-  readonly property real freePct: disk ? (disk.free_pct || 0) : 0
-  readonly property real usedPct: 100.0 - freePct
-  readonly property string reclaimableFormatted: summary ? (summary.reclaimable_formatted || "0 MB") : "0 MB"
-  readonly property string safeFormatted: summary ? (summary.safe_formatted || "0 MB") : "0 MB"
-
-  function open() {
-    root.controller.show()
-    if (hostWidget && hostWidget.refresh) hostWidget.refresh()
-  }
-
-  function close() {
-    root.controller.hide()
-  }
-
-  function toggle() {
-    if (root.opened) root.close()
-    else root.open()
+  function refresh() {
+    if (!statusProc.running) {
+      statusProc.running = true
+    }
   }
 
   function runCleanSafe() {
-    if (hostWidget && hostWidget.cleanProc) {
-      hostWidget.cleanProc.running = true
-    } else {
-      Quickshell.execDetached(["alpheus", "clean", "--all-safe", "-y"])
+    if (!cleanProc.running) {
+      cleanProc.running = true
     }
   }
 
   function openTerminal() {
-    Quickshell.execDetached(["omarchy-terminal-window", "alpheus", "scan"])
+    if (root.bar) root.bar.run("xdg-terminal-exec -e alpheus -i")
+    else Quickshell.execDetached(["xdg-terminal-exec", "-e", "alpheus", "-i"])
+    root.close()
   }
 
-  contentWidth: Style.space(340)
-  contentHeight: panel.fittedContentHeight(column.implicitHeight)
+  function openBrowse() {
+    if (root.bar) root.bar.run("xdg-terminal-exec -e alpheus browse ~")
+    else Quickshell.execDetached(["xdg-terminal-exec", "-e", "alpheus", "browse", "~"])
+    root.close()
+  }
 
-  PanelKeyCatcher {
-    id: keyCatcher
+  visible: true
+  implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
+
+  Process {
+    id: statusProc
+    running: false
+    command: ["alpheus", "status", "--json"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var data = JSON.parse(text)
+          root.statusData = data
+          if (data && data.disk) {
+            root.freeFormatted = data.disk.free_formatted || "…"
+            root.totalFormatted = data.disk.total_formatted || "…"
+            root.freePct = data.disk.free_pct || 100
+            root.usedPct = 100.0 - root.freePct
+          }
+          if (data && data.summary) {
+            root.reclaimableFormatted = data.summary.reclaimable_formatted || "0 MB"
+            root.safeFormatted = data.summary.safe_formatted || "0 MB"
+          }
+        } catch (e) {}
+      }
+    }
+  }
+
+  Process {
+    id: cleanProc
+    running: false
+    command: ["alpheus", "clean", "--all-safe", "-y"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        root.refresh()
+      }
+    }
+  }
+
+  Timer {
+    interval: 60000
+    running: true
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: root.refresh()
+  }
+
+  // ---------- Bar Button ----------
+  WidgetButton {
+    id: button
     anchors.fill: parent
-    onCloseRequested: root.close()
+    bar: root.bar
+    text: "💾 " + root.freeFormatted
+    tooltipText: "Alpheus Storage: " + root.freeFormatted + " free (" + root.reclaimableFormatted + " reclaimable)"
+    horizontalMargin: 7.5
+    onPressed: function(b) {
+      if (b === Qt.RightButton) {
+        root.openTerminal()
+      } else {
+        root.toggle()
+      }
+    }
+  }
 
-    Column {
-      id: column
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.top: parent.top
-      spacing: Style.space(12)
+  // ---------- Dropdown Popup Panel ----------
+  KeyboardPanel {
+    id: panel
+    anchorItem: button
+    owner: root
+    bar: root.bar
+    open: root.opened
+    focusTarget: keyCatcher
+    contentWidth: panel.fittedContentWidth(Style.space(380))
+    contentHeight: panel.fittedContentHeight(column.implicitHeight)
 
-      // ---------------- Header / Hero ----------------
-      Row {
-        width: parent.width
+    PanelKeyCatcher {
+      id: keyCatcher
+      anchors.fill: parent
+      onCloseRequested: root.close()
+      onTabRequested: function(direction) { root.switchPanel(direction) }
+
+      Column {
+        id: column
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
         spacing: Style.space(12)
 
-        Text {
-          text: "󰋊"
-          font.family: root.bar ? root.bar.fontFamily : Style.font.family
-          font.pixelSize: Style.font.display
-          color: root.freePct < 10.0 ? (root.bar ? root.bar.urgent : Color.urgent) : (root.bar ? root.bar.foreground : Color.foreground)
-          anchors.verticalCenter: parent.verticalCenter
-        }
-
-        Column {
-          anchors.verticalCenter: parent.verticalCenter
-          spacing: Style.space(2)
+        // Header / Disk Info
+        Row {
+          width: parent.width
+          spacing: Style.space(12)
 
           Text {
-            text: "Alpheus Storage"
-            font.family: root.bar ? root.bar.fontFamily : Style.font.family
+            text: "💾"
             font.pixelSize: Style.font.title
-            font.bold: true
-            color: root.bar ? root.bar.foreground : Color.foreground
-          }
-
-          Text {
-            text: root.freeFormatted + " free of " + root.totalFormatted + " (" + root.freePct.toFixed(1) + "% available)"
-            font.family: root.bar ? root.bar.fontFamily : Style.font.family
-            font.pixelSize: Style.font.caption
-            color: Qt.darker(root.bar ? root.bar.foreground : Color.foreground, 1.35)
-          }
-        }
-      }
-
-      // ---------------- Disk Usage Bar ----------------
-      Rectangle {
-        width: parent.width
-        height: Style.space(8)
-        radius: Style.space(4)
-        color: Qt.darker(root.bar ? root.bar.foreground : Color.foreground, 3.5)
-
-        Rectangle {
-          width: Math.max(Style.space(4), (parent.width * (root.usedPct / 100.0)))
-          height: parent.height
-          radius: parent.radius
-          color: root.usedPct > 90.0 ? (root.bar ? root.bar.urgent : Color.urgent) : (root.bar ? root.bar.foreground : Color.foreground)
-        }
-      }
-
-      PanelSeparator {
-        width: parent.width
-        bar: root.bar
-      }
-
-      // ---------------- Reclaimable Summary ----------------
-      Row {
-        width: parent.width
-        Text {
-          text: "Reclaimable:"
-          font.family: root.bar ? root.bar.fontFamily : Style.font.family
-          font.pixelSize: Style.font.body
-          color: root.bar ? root.bar.foreground : Color.foreground
-        }
-
-        Item { Layout.fillWidth: true; width: 1 }
-
-        Text {
-          text: root.reclaimableFormatted + " (" + root.safeFormatted + " safe)"
-          font.family: root.bar ? root.bar.fontFamily : Style.font.family
-          font.pixelSize: Style.font.body
-          font.bold: true
-          color: (root.summary && root.summary.reclaimable_kb > 0) ? "#4ade80" : (root.bar ? root.bar.foreground : Color.foreground)
-        }
-      }
-
-      // ---------------- Category Cards List ----------------
-      ListView {
-        id: cardsList
-        width: parent.width
-        implicitHeight: Math.min(220, contentHeight)
-        clip: true
-        model: root.cards
-
-        delegate: Item {
-          width: cardsList.width
-          implicitHeight: Style.space(34)
-
-          Row {
-            anchors.left: parent.left
-            anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(8)
+          }
 
-            Rectangle {
-              width: Style.space(6)
-              height: Style.space(6)
-              radius: Style.space(3)
-              anchors.verticalCenter: parent.verticalCenter
-              color: modelData.tier === "safe" ? "#4ade80" : (modelData.tier === "with-care" ? "#facc15" : "#94a3b8")
-            }
+          Column {
+            width: parent.width - Style.space(140)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(2)
 
-            Column {
-              width: parent.width - sizeText.width - Style.space(24)
-              spacing: 0
-
-              Text {
-                text: modelData.title || modelData.id
-                font.family: root.bar ? root.bar.fontFamily : Style.font.family
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                color: root.bar ? root.bar.foreground : Color.foreground
-                elide: Text.ElideRight
-                width: parent.width
-              }
-
-              Text {
-                text: modelData.action === "command" ? (modelData.command_display || "command") : (modelData.paths && modelData.paths.length > 0 ? modelData.paths[0] : "—")
-                font.family: root.bar ? root.bar.fontFamily : Style.font.family
-                font.pixelSize: Style.font.caption - 1
-                color: Qt.darker(root.bar ? root.bar.foreground : Color.foreground, 1.5)
-                elide: Text.ElideMiddle
-                width: parent.width
-              }
+            Text {
+              text: "Alpheus Storage"
+              color: Color.foreground
+              font.pixelSize: Style.font.title
+              font.bold: true
             }
 
             Text {
-              id: sizeText
-              text: {
-                var kb = modelData.size_kb || 0
-                var gb = kb / (1024 * 1024)
-                if (gb >= 1.0) return gb.toFixed(1) + " GB"
-                var mb = kb / 1024
-                if (mb >= 1.0) return mb.toFixed(0) + " MB"
-                return kb + " KB"
-              }
-              font.family: root.bar ? root.bar.fontFamily : Style.font.family
+              text: root.freeFormatted + " free of " + root.totalFormatted + " (" + root.freePct.toFixed(1) + "% available)"
+              color: Color.muted
+              font.pixelSize: Style.font.bodySmall
+            }
+          }
+
+          Text {
+            text: root.usedPct.toFixed(0) + "%"
+            color: Color.foreground
+            font.pixelSize: Style.font.displayLarge
+            font.bold: true
+            anchors.verticalCenter: parent.verticalCenter
+          }
+        }
+
+        // Progress bar
+        Item {
+          width: parent.width
+          implicitHeight: Style.space(6)
+
+          Rectangle {
+            anchors.fill: parent
+            radius: height / 2
+            color: Util.alpha(Color.foreground, 0.15)
+          }
+
+          Rectangle {
+            height: parent.height
+            width: Math.max(0, Math.min(parent.width, parent.width * (root.usedPct / 100.0)))
+            radius: height / 2
+            color: root.freePct < 15 ? Color.urgent : Color.accent
+          }
+        }
+
+        PanelSeparator {}
+
+        // Reclaimable Summary Section
+        Row {
+          width: parent.width
+          spacing: Style.space(8)
+
+          Column {
+            width: parent.width - Style.space(120)
+            spacing: Style.space(2)
+
+            Text {
+              text: "RECLAIMABLE CACHES"
+              color: Color.muted
               font.pixelSize: Style.font.caption
               font.bold: true
-              color: root.bar ? root.bar.foreground : Color.foreground
-              anchors.verticalCenter: parent.verticalCenter
+              font.letterSpacing: 1.0
+            }
+
+            Text {
+              text: root.safeFormatted + " safe (" + root.reclaimableFormatted + " total)"
+              color: Color.accent
+              font.pixelSize: Style.font.body
+              font.bold: true
+            }
+          }
+
+          Button {
+            text: root.isScanning ? "Cleaning…" : "Clean Safe"
+            enabled: !root.isScanning
+            bordered: true
+            active: true
+            anchors.verticalCenter: parent.verticalCenter
+            onClicked: root.runCleanSafe()
+          }
+        }
+
+        // Top 3 Cards Preview
+        Repeater {
+          model: root.cards.slice(0, 3)
+          delegate: Row {
+            required property var modelData
+            width: parent.width
+            spacing: Style.space(8)
+
+            Text {
+              text: "• " + (modelData.title || modelData.id)
+              color: Color.foreground
+              opacity: 0.85
+              font.pixelSize: Style.font.bodySmall
+              elide: Text.ElideRight
+              width: parent.width - Style.space(90)
+            }
+
+            Text {
+              text: (modelData.size_kb ? ((modelData.size_kb / 1024).toFixed(0) + " MB") : "—")
+              color: modelData.tier === "safe" ? Color.accent : Color.urgent
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+              horizontalAlignment: Text.AlignRight
+              width: Style.space(80)
             }
           }
         }
-      }
 
-      PanelSeparator {
-        width: parent.width
-        bar: root.bar
-      }
+        PanelSeparator {}
 
-      // ---------------- Actions ----------------
-      Row {
-        width: parent.width
-        spacing: Style.space(8)
+        // Bottom Actions
+        Row {
+          width: parent.width
+          spacing: Style.space(8)
 
-        Button {
-          text: root.isScanning ? "Cleaning…" : "Clean Safe (" + root.safeFormatted + ")"
-          enabled: !root.isScanning && root.summary && root.summary.safe_kb > 0
-          bar: root.bar
-          onClicked: root.runCleanSafe()
-        }
+          Button {
+            width: (parent.width - Style.space(8)) / 2
+            text: "Tree Explorer"
+            bordered: true
+            onClicked: root.openBrowse()
+          }
 
-        Button {
-          text: "Terminal"
-          bar: root.bar
-          onClicked: root.openTerminal()
-        }
-
-        Button {
-          text: "↻"
-          bar: root.bar
-          onClicked: {
-            if (hostWidget && hostWidget.refresh) hostWidget.refresh()
+          Button {
+            width: (parent.width - Style.space(8)) / 2
+            text: "Interactive TUI"
+            bordered: true
+            onClicked: root.openTerminal()
           }
         }
       }

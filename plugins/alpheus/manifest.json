@@ -10,7 +10,7 @@
     "bar-widget"
   ],
   "entryPoints": {
-    "barWidget": "BarWidget.qml"
+    "barWidget": "Panel.qml"
   },
   "barWidget": {
     "displayName": "Alpheus Storage",
