@@ -69,7 +69,11 @@ fn collect_files(dir: &Path, min_size_bytes: u64, list: &mut Vec<(PathBuf, u64)>
             if ft.is_dir() {
                 let name = entry.file_name();
                 let name_str = name.to_string_lossy();
-                if name_str.starts_with('.') || name_str == "node_modules" || name_str == "target" || name_str == ".git" {
+                if name_str.starts_with('.')
+                    || name_str == "node_modules"
+                    || name_str == "target"
+                    || name_str == ".git"
+                {
                     continue;
                 }
                 collect_files(&path, min_size_bytes, list);
@@ -142,7 +146,10 @@ pub fn scan_duplicates(root: &Path, min_size_kb: u64) -> DuplicateScanResult {
         paths.sort();
 
         let original = paths.remove(0);
-        let duplicates: Vec<String> = paths.iter().map(|p| p.to_string_lossy().to_string()).collect();
+        let duplicates: Vec<String> = paths
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
         let file_size_kb = size_bytes / 1024;
         let wasted_kb = (duplicates.len() as u64) * file_size_kb;
 

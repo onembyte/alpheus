@@ -29,10 +29,8 @@ pub fn usage() -> DiskUsage {
         }
     };
 
-    try_df(&home)
-        .or_else(|| try_df("/"))
-        .unwrap_or(DiskUsage {
-            total_kb: 0,
-            free_kb: 0,
-        })
+    try_df(&home).or_else(|| try_df("/")).unwrap_or(DiskUsage {
+        total_kb: 0,
+        free_kb: 0,
+    })
 }

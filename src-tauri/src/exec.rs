@@ -27,11 +27,14 @@ pub struct DryRun {
     pub warning: Option<String>,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Debug)]
 pub struct ExecResult {
     pub freed_kb: u64,
     pub method: String,
     pub message: String,
+    /// Whether anything was actually removed. A command can exit 0 and change
+    /// nothing; the UI must not retire a card on the strength of an exit code.
+    pub effective: bool,
 }
 
 const FIVE_GB_KB: u64 = 5 * 1024 * 1024;
@@ -98,13 +101,34 @@ fn verified_paths(card: &Card) -> Result<Vec<PathBuf>, String> {
 pub fn dry_run(card: &Card) -> Result<DryRun, String> {
     match card.action {
         ActionKind::Explain => Err("This card is informational — nothing to execute.".into()),
-        ActionKind::Command => Ok(DryRun {
-            entries: vec![],
-            total_kb: card.size_kb,
-            method: "command".into(),
-            command: card.command_display.clone(),
-            warning: warning_for(card),
-        }),
+        // A command card's total is only quotable when the scanner attached the
+        // exact paths the command clears. With no paths there is nothing to
+        // measure, and 0 renders as "unknown" rather than a number nobody
+        // checked — the sheet must never promise space a command may not free.
+        ActionKind::Command => {
+            let paths: Vec<PathBuf> = card
+                .paths
+                .iter()
+                .map(PathBuf::from)
+                .filter(|p| p.exists())
+                .collect();
+            let sizes = scan::du_many_kb(&paths);
+            let mut entries: Vec<DryRunEntry> = paths
+                .iter()
+                .map(|p| DryRunEntry {
+                    path: p.to_string_lossy().to_string(),
+                    size_kb: sizes.get(p).copied().unwrap_or(0),
+                })
+                .collect();
+            entries.sort_by_key(|e| std::cmp::Reverse(e.size_kb));
+            Ok(DryRun {
+                total_kb: entries.iter().map(|e| e.size_kb).sum(),
+                entries,
+                method: "command".into(),
+                command: card.command_display.clone(),
+                warning: warning_for(card),
+            })
+        }
         ActionKind::Delete => {
             let paths = verified_paths(card)?;
             let sizes = scan::du_many_kb(&paths);
@@ -147,16 +171,14 @@ pub fn execute(card: &Card) -> Result<ExecResult, String> {
                     freed_kb: total_kb,
                     method,
                     message: format!("Emptied the Trash — {} freed.", fmt(total_kb)),
+                    effective: true,
                 });
             }
 
             if method == "delete" {
                 for p in &paths {
                     // Make read-only files (e.g. Go modules) writable before removing
-                    let _ = Command::new("chmod")
-                        .args(["-R", "u+w"])
-                        .arg(p)
-                        .output();
+                    let _ = Command::new("chmod").args(["-R", "u+w"]).arg(p).output();
                     remove_path(p)?;
                 }
                 Ok(ExecResult {
@@ -167,6 +189,7 @@ pub fn execute(card: &Card) -> Result<ExecResult, String> {
                         fmt(total_kb),
                         paths.len()
                     ),
+                    effective: true,
                 })
             } else {
                 trash::delete_all(&paths).map_err(|e| e.to_string())?;
@@ -177,6 +200,7 @@ pub fn execute(card: &Card) -> Result<ExecResult, String> {
                         "Moved {} to the Trash — empty it to actually free the space.",
                         fmt(total_kb)
                     ),
+                    effective: true,
                 })
             }
         }
@@ -215,7 +239,7 @@ fn empty_trash_dirs(trash_dirs: &[PathBuf]) -> Result<(), String> {
 /// Fixed, allowlisted commands only — the card id picks the argv, nothing from
 /// the frontend reaches a shell.
 fn run_command_card(card: &Card) -> Result<ExecResult, String> {
-    let before = crate::disk::usage().free_kb;
+    let before = measure(card);
     match card.id.as_str() {
         "pacman-cache" => {
             if Path::new("/usr/bin/paccache").exists() {
@@ -251,7 +275,19 @@ fn run_command_card(card: &Card) -> Result<ExecResult, String> {
             run_ok(&[brew, "cleanup", "--prune=all"])?;
         }
         "xcode-simulators" => {
-            run_ok(&["/usr/bin/xcrun", "simctl", "delete", "unavailable"])?;
+            // simctl lives inside Xcode.app and disappears with it, so it is
+            // resolved here rather than assumed. A CommandLineTools-only Mac
+            // used to get a raw `xcrun: error:` dumped into the UI.
+            #[cfg(target_os = "macos")]
+            {
+                let simctl = crate::simulators::simctl().ok_or(
+                    "Xcode is not installed, so simctl no longer exists. Rescan — Alpheus will offer to remove the stranded simulator data directly.",
+                )?;
+                let simctl = simctl.to_string_lossy().to_string();
+                run_ok(&[&simctl, "delete", "unavailable"])?;
+            }
+            #[cfg(not(target_os = "macos"))]
+            return Err("iOS simulators only exist on macOS".into());
         }
         "tm-snapshots" => {
             let out = Command::new("tmutil")
@@ -272,12 +308,64 @@ fn run_command_card(card: &Card) -> Result<ExecResult, String> {
         }
         other => return Err(format!("no allowlisted command for card {other}")),
     }
-    let freed = crate::disk::usage().free_kb.saturating_sub(before);
+    // Accounting: measure the card's own paths, not the volume's free space.
+    // Whole-disk deltas are polluted by every other write on the machine and
+    // by APFS reclaiming lazily, and `saturating_sub` silently floors a
+    // negative reading to "0 MB freed" on a command that worked fine.
+    let (freed, effective) = match &before {
+        Measured::Paths { total_kb, paths } => {
+            let after: u64 = scan::du_many_kb(paths).values().sum();
+            let freed = total_kb.saturating_sub(after);
+            (freed, freed > 0)
+        }
+        // Nothing local to measure (Time Machine snapshots pin space that is
+        // not attributable to a path). Fall back to the volume delta and say
+        // so rather than pretending to a figure.
+        Measured::Volume { free_kb } => {
+            let freed = crate::disk::usage().free_kb.saturating_sub(*free_kb);
+            (freed, true)
+        }
+    };
+
+    let message = if effective && freed > 0 {
+        format!("Done — {} freed.", fmt(freed))
+    } else if effective {
+        "Done.".to_string()
+    } else {
+        "Nothing to do — that command found no work left. The card stays until the next scan confirms it.".to_string()
+    };
+
     Ok(ExecResult {
         freed_kb: freed,
         method: "command".into(),
-        message: format!("Done — {} freed.", fmt(freed)),
+        message,
+        effective,
     })
+}
+
+/// What a command card can honestly be measured against.
+enum Measured {
+    Paths { total_kb: u64, paths: Vec<PathBuf> },
+    Volume { free_kb: u64 },
+}
+
+fn measure(card: &Card) -> Measured {
+    let paths: Vec<PathBuf> = card
+        .paths
+        .iter()
+        .map(PathBuf::from)
+        .filter(|p| p.exists())
+        .collect();
+    if paths.is_empty() {
+        Measured::Volume {
+            free_kb: crate::disk::usage().free_kb,
+        }
+    } else {
+        Measured::Paths {
+            total_kb: scan::du_many_kb(&paths).values().sum(),
+            paths,
+        }
+    }
 }
 
 fn run_ok(argv: &[&str]) -> Result<(), String> {

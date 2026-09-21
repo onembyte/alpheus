@@ -94,7 +94,12 @@ export function useStorage() {
     try {
       const res = await api.execute(modal.card.id);
       showToast(res.message);
-      setCards((cs) => (cs ? cs.filter((c) => c.id !== modal.card.id) : cs));
+      // Only retire the card when something actually went. A command can exit
+      // 0 having found no work, and dropping the card then hides space that is
+      // still on disk until the next full scan.
+      if (res.effective) {
+        setCards((cs) => (cs ? cs.filter((c) => c.id !== modal.card.id) : cs));
+      }
       setModal(null);
       refreshUsage();
       refreshHistory();

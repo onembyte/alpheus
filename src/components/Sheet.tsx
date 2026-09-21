@@ -127,7 +127,11 @@ export default function Sheet({ card, dryRun, freeKb, busy, onConfirm, onCancel 
             </span>
           </div>
           <div className="flex justify-between">
-            <span style={{ color: "var(--txt3)" }}>space reclaimed</span>
+            {/* A command's yield is its tool's decision, not ours — label the
+                figure as the estimate it is rather than a guarantee. */}
+            <span style={{ color: "var(--txt3)" }}>
+              space reclaimed{dryRun.method === "command" ? " (est.)" : ""}
+            </span>
             <span className="font-semibold" style={{ color: "var(--good)" }}>
               {dryRun.total_kb > 0 ? fmtKB(dryRun.total_kb) : "—"}
             </span>

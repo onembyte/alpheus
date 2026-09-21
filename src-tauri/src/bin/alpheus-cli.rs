@@ -151,12 +151,16 @@ fn run_scan(cards: &[Card], usage: &disk::DiskUsage) {
         0.0
     };
 
-    println!("\x1b[1m══════════════════════════════════════════════════════════════════════\x1b[0m");
+    println!(
+        "\x1b[1m══════════════════════════════════════════════════════════════════════\x1b[0m"
+    );
     println!(
         "\x1b[1;36m  ALPHEUS STORAGE MANAGER\x1b[0m  v{}",
         env!("CARGO_PKG_VERSION")
     );
-    println!("\x1b[1m══════════════════════════════════════════════════════════════════════\x1b[0m");
+    println!(
+        "\x1b[1m══════════════════════════════════════════════════════════════════════\x1b[0m"
+    );
     println!(
         "  Disk: \x1b[1m{:.1} GB free\x1b[0m of {:.1} GB ({:.1}% available)",
         free_gb, total_gb, free_pct
@@ -243,7 +247,9 @@ fn run_scan(cards: &[Card], usage: &disk::DiskUsage) {
         println!();
     }
 
-    println!("\x1b[1m──────────────────────────────────────────────────────────────────────\x1b[0m");
+    println!(
+        "\x1b[1m──────────────────────────────────────────────────────────────────────\x1b[0m"
+    );
     println!(
         "  \x1b[1;32mReclaimable:\x1b[0m {} safe  |  {} total",
         fmt_kb(total_safe),
@@ -265,7 +271,10 @@ fn run_dry_run(card_id: &str, cards: &[Card]) {
         }
     };
 
-    println!("\x1b[1mDry-run for category: {}\x1b[0m ({})", card.title, card.id);
+    println!(
+        "\x1b[1mDry-run for category: {}\x1b[0m ({})",
+        card.title, card.id
+    );
     println!("Description: {}", card.description);
 
     match exec::dry_run(card) {
@@ -277,7 +286,10 @@ fn run_dry_run(card_id: &str, cards: &[Card]) {
             if let Some(w) = &dr.warning {
                 println!("\x1b[33mWarning: {}\x1b[0m", w);
             }
-            println!("Total Reclaimable: \x1b[1;32m{}\x1b[0m", fmt_kb(dr.total_kb));
+            println!(
+                "Total Reclaimable: \x1b[1;32m{}\x1b[0m",
+                fmt_kb(dr.total_kb)
+            );
             println!();
 
             if !dr.entries.is_empty() {
@@ -437,8 +449,14 @@ fn run_top(target_str: Option<&str>, limit: usize) {
         return;
     }
 
-    println!("Total Scanned: \x1b[1m{}\x1b[0m\n", fmt_kb(analysis.total_scanned_kb));
-    println!("  {: >8}   {: <6}  {: <30}  {}", "SIZE", "%", "NAME", "PATH");
+    println!(
+        "Total Scanned: \x1b[1m{}\x1b[0m\n",
+        fmt_kb(analysis.total_scanned_kb)
+    );
+    println!(
+        "  {: >8}   {: <6}  {: <30}  {}",
+        "SIZE", "%", "NAME", "PATH"
+    );
     println!("  ────────────────────────────────────────────────────────────────────────────");
 
     for e in analysis.entries {
@@ -509,7 +527,10 @@ fn run_snapshot(target_str: Option<&str>) {
     let default_path = scan::home();
     let target = target_str.map(Path::new).unwrap_or(&default_path);
 
-    println!("\x1b[1mRecording disk snapshot baseline for:\x1b[0m {}", target.display());
+    println!(
+        "\x1b[1mRecording disk snapshot baseline for:\x1b[0m {}",
+        target.display()
+    );
     match snapshot::take_snapshot(target) {
         Ok(snap) => {
             println!(
@@ -526,11 +547,16 @@ fn run_diff(target_str: Option<&str>) {
     let default_path = scan::home();
     let target = target_str.map(Path::new).unwrap_or(&default_path);
 
-    println!("\x1b[1mComparing disk changes for:\x1b[0m {}", target.display());
+    println!(
+        "\x1b[1mComparing disk changes for:\x1b[0m {}",
+        target.display()
+    );
     match snapshot::diff_latest_with_live(target) {
         Ok(diff) => {
             if diff.changes.is_empty() {
-                println!("\x1b[32m✔ No major disk usage changes detected since last snapshot.\x1b[0m");
+                println!(
+                    "\x1b[32m✔ No major disk usage changes detected since last snapshot.\x1b[0m"
+                );
                 return;
             }
 
@@ -539,10 +565,16 @@ fn run_diff(target_str: Option<&str>) {
                 fmt_delta(diff.net_growth_kb),
                 diff.changes.len()
             );
-            println!("────────────────────────────────────────────────────────────────────────────");
+            println!(
+                "────────────────────────────────────────────────────────────────────────────"
+            );
 
             for c in diff.changes.iter().take(20) {
-                let color = if c.delta_kb > 0 { "\x1b[31m" } else { "\x1b[32m" };
+                let color = if c.delta_kb > 0 {
+                    "\x1b[31m"
+                } else {
+                    "\x1b[32m"
+                };
                 println!(
                     "  {: >10}  ({: >8} → {: >8})  \x1b[90m{}\x1b[0m",
                     format!("{}{}\x1b[0m", color, fmt_delta(c.delta_kb)),
@@ -596,13 +628,9 @@ fn run_watch(threshold_pct: f64) {
 
                 #[cfg(target_os = "macos")]
                 {
-                    let script = format!(
-                        "display notification \"{}\" with title \"{}\"",
-                        msg, title
-                    );
-                    let _ = Command::new("osascript")
-                        .args(["-e", &script])
-                        .output();
+                    let script =
+                        format!("display notification \"{}\" with title \"{}\"", msg, title);
+                    let _ = Command::new("osascript").args(["-e", &script]).output();
                 }
 
                 println!("\x1b[31m[ALERT] {}\x1b[0m", msg);
@@ -1033,7 +1061,10 @@ fn run_interactive_tui(cards: &[Card], usage: &disk::DiskUsage) -> io::Result<()
     match res? {
         Some(to_clean) => {
             println!();
-            println!("\x1b[1mExecuting cleanup for selected items ({})...\x1b[0m", to_clean.len());
+            println!(
+                "\x1b[1mExecuting cleanup for selected items ({})...\x1b[0m",
+                to_clean.len()
+            );
             let app_dir = scan::home().join(".local/share/alpheus");
             let mut total_freed = 0u64;
 
@@ -1261,7 +1292,8 @@ fn main() {
                 return;
             }
             "uninstall" => {
-                let auto_yes = args.contains(&"-y".to_string()) || args.contains(&"--yes".to_string());
+                let auto_yes =
+                    args.contains(&"-y".to_string()) || args.contains(&"--yes".to_string());
                 run_uninstall(auto_yes);
                 return;
             }
@@ -1308,13 +1340,16 @@ fn main() {
             }
             "clean" => {
                 let cards = scan::scan_all();
-                let auto_yes = args.contains(&"-y".to_string()) || args.contains(&"--yes".to_string());
+                let auto_yes =
+                    args.contains(&"-y".to_string()) || args.contains(&"--yes".to_string());
                 if args.contains(&"--all-safe".to_string()) {
                     run_clean_all_safe(&cards, auto_yes);
                 } else if args.len() >= 3 && !args[2].starts_with('-') {
                     run_clean_single(&args[2], &cards, auto_yes);
                 } else {
-                    eprintln!("Usage: alpheus clean <card-id> [-y] or alpheus clean --all-safe [-y]");
+                    eprintln!(
+                        "Usage: alpheus clean <card-id> [-y] or alpheus clean --all-safe [-y]"
+                    );
                 }
                 return;
             }

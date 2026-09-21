@@ -39,7 +39,7 @@ jobs:
           workspaces: src-tauri
 
       - name: Rust — Build Standalone CLI
-        run: cargo build --release --bin alpheus
+        run: cargo build --release --bin alpheus-cli
         working-directory: src-tauri
 
       - name: Rust — Test Suite

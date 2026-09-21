@@ -1,6 +1,6 @@
 [package]
 name = "alpheus"
-version = "0.8.2"
+version = "0.8.3"
 description = "Honest storage pane for a chronically full MacBook"
 authors = ["Franco Michetti"]
 edition = "2021"
@@ -23,12 +23,17 @@ chrono = "0.4"
 crossterm = "0.28"
 sha2 = "0.10"
 
+# Order and naming here are both load-bearing for `tauri build --target
+# universal-apple-darwin`: it runs `lipo` on the binary named after the
+# *package*, but bundles the *last* [[bin]] entry. The GUI has to be both, or
+# the DMG silently ships the wrong executable — it shipped the CLI until
+# v0.8.3, because the CLI held the package name.
 [[bin]]
-name = "alpheus"
-path = "src/bin/alpheus.rs"
+name = "alpheus-cli"
+path = "src/bin/alpheus-cli.rs"
 
 [[bin]]
-name = "alpheus-app"
+name = "alpheus"
 path = "src/main.rs"
 
 [profile.release]

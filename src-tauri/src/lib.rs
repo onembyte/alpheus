@@ -14,6 +14,8 @@ pub mod history;
 pub mod rules;
 pub mod scan;
 pub mod settings;
+#[cfg(target_os = "macos")]
+pub mod simulators;
 pub mod snapshot;
 
 use std::collections::HashMap;

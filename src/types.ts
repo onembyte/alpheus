@@ -35,6 +35,8 @@ export interface ExecResult {
   freed_kb: number;
   method: string;
   message: string;
+  /** False when the command exited cleanly but removed nothing. */
+  effective: boolean;
 }
 
 export interface HistoryEntry {

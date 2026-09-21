@@ -22,13 +22,13 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Build Linux release binary
-        run: cargo build --release --bin alpheus
+        run: cargo build --release --bin alpheus-cli
         working-directory: src-tauri
 
       - name: Package Linux release archive
         run: |
           mkdir -p dist/alpheus-linux-x86_64
-          cp src-tauri/target/release/alpheus dist/alpheus-linux-x86_64/
+          cp src-tauri/target/release/alpheus-cli dist/alpheus-linux-x86_64/
           cp alpheus.desktop dist/alpheus-linux-x86_64/ 2>/dev/null || true
           cp -r plugins/alpheus dist/alpheus-linux-x86_64/ 2>/dev/null || true
           cp scripts/install.sh dist/alpheus-linux-x86_64/ 2>/dev/null || true
@@ -48,13 +48,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Build macOS CLI binary
-        run: cargo build --release --bin alpheus
+        run: cargo build --release --bin alpheus-cli
         working-directory: src-tauri
 
       - name: Package macOS CLI
         run: |
           mkdir -p dist/alpheus-macos
-          cp src-tauri/target/release/alpheus dist/alpheus-macos/
+          cp src-tauri/target/release/alpheus-cli dist/alpheus-macos/
           cp README.md LICENSE dist/alpheus-macos/ 2>/dev/null || true
           tar -czvf dist/alpheus-macos.tar.gz -C dist alpheus-macos
 
@@ -62,3 +62,40 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/alpheus-macos.tar.gz
+
+  build-macos-dmg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Builds both slices, lipos every [[bin]], bundles, then verifies the app
+      # executable really is the GUI and really is universal. See the script —
+      # `tauri build --target universal-apple-darwin` alone gets this wrong.
+      - name: Build and verify the universal DMG
+        run: ./scripts/build-dmg.sh
+
+      - name: Name the asset for the README download link
+        run: |
+          mkdir -p dist
+          cp src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg \
+             dist/Alpheus-macOS.dmg
+
+      - name: Upload DMG Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Alpheus-macOS.dmg

@@ -170,7 +170,11 @@ fn find_artifacts(
                 }
             }
         }
-        if name == "__pycache__" || name == ".pytest_cache" || name == ".ruff_cache" || name == ".mypy_cache" {
+        if name == "__pycache__"
+            || name == ".pytest_cache"
+            || name == ".ruff_cache"
+            || name == ".mypy_cache"
+        {
             if !is_denied(&path) {
                 pycaches.push(path);
             }
@@ -411,6 +415,150 @@ fn scan_projects() -> Vec<Card> {
     out
 }
 
+// ---------------------------------------------------------------- simulators
+
+/// iOS Simulator storage, reported as what it actually is.
+///
+/// The rule this replaces promised the size of the whole Devices tree and
+/// offered `simctl delete unavailable` to reclaim it — two numbers that never
+/// match, on a command that does not exist without full Xcode. Every card below
+/// is sized from exactly the bytes its own action removes, and no card is
+/// emitted for an action this machine cannot perform.
+#[cfg(target_os = "macos")]
+fn scan_simulators() -> Vec<Card> {
+    use crate::exec::fmt;
+    use crate::simulators;
+
+    let mut out = vec![];
+    let devices = simulators::devices();
+    if devices.is_empty() {
+        return out;
+    }
+    let have_simctl = simulators::simctl().is_some();
+    let busy = simulators::simulator_booted();
+
+    let detail =
+        |d: &simulators::Device| format!("{}  ·  {}  ·  {}", fmt(d.size_kb), d.name, d.runtime);
+
+    // --- devices nothing can boot -------------------------------------------
+    let stranded: Vec<&simulators::Device> =
+        devices.iter().filter(|d| d.stranded && !d.booted).collect();
+    let stranded_kb: u64 = stranded.iter().map(|d| d.size_kb).sum();
+
+    if !stranded.is_empty() && stranded_kb >= 1024 {
+        let proof = stranded
+            .iter()
+            .map(|d| detail(d))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        match simulators::remedy(have_simctl, busy) {
+            simulators::Remedy::Simctl => {
+                // Xcode is installed, so hand the job to the tool that owns the
+                // device set. Size is the measured total of the devices simctl
+                // itself reports as unavailable — nothing more.
+                out.push(Card {
+                id: "xcode-simulators".into(),
+                title: format!("Stranded iOS simulators ({})", stranded.len()),
+                description: "Simulator devices whose runtime is no longer installed — nothing can boot them. Removed through Xcode's own simctl, which updates the device set as it goes. Healthy simulators are untouched.".into(),
+                tier: Tier::WithCare,
+                size_kb: stranded_kb,
+                paths: stranded
+                    .iter()
+                    .map(|d| d.path.to_string_lossy().to_string())
+                    .collect(),
+                proof: Some(proof),
+                action: ActionKind::Command,
+                command_display: Some("xcrun simctl delete unavailable".into()),
+            });
+            }
+            simulators::Remedy::Blocked => {
+                out.push(Card {
+                id: "xcode-simulators-busy".into(),
+                title: "Simulator data is in use".into(),
+                description: "Stranded simulator devices are on disk, but a simulator is currently booted. Quit Simulator, then rescan — Alpheus will offer to remove them.".into(),
+                tier: Tier::Manual,
+                size_kb: stranded_kb,
+                paths: vec![],
+                proof: Some(proof),
+                action: ActionKind::Explain,
+                command_display: None,
+            });
+            }
+            simulators::Remedy::DeleteDirs => {
+                // No simctl means no Xcode, so every device directory is dead
+                // weight and there is no tool left to remove it. These are plain
+                // directories inside $HOME — delete them directly, through the
+                // same denylist and Trash rules as any other card.
+                out.push(Card {
+                id: "xcode-simulators-stranded".into(),
+                title: format!("Orphaned iOS simulators ({})", stranded.len()),
+                description: "Xcode is not installed, so simctl no longer exists and these simulator devices can never be booted or managed again. They are ordinary directories now — this removes exactly the ones listed.".into(),
+                tier: Tier::WithCare,
+                size_kb: stranded_kb,
+                paths: stranded
+                    .iter()
+                    .map(|d| d.path.to_string_lossy().to_string())
+                    .collect(),
+                proof: Some(proof),
+                action: ActionKind::Delete,
+                command_display: None,
+            });
+            }
+        }
+    }
+
+    // --- healthy devices: report, never offer -------------------------------
+    let live: Vec<&simulators::Device> = devices.iter().filter(|d| !d.stranded).collect();
+    let live_kb: u64 = live.iter().map(|d| d.size_kb).sum();
+    if live_kb >= 1024 {
+        out.push(Card {
+            id: "xcode-simulators-live".into(),
+            title: format!("Working iOS simulators ({})", live.len()),
+            description: "Bootable simulators, each carrying its own data volume. Erasing one is a judgement call about a working device, so Alpheus only shows where the space went: use `xcrun simctl erase <udid>` for the ones you no longer need.".into(),
+            tier: Tier::Manual,
+            size_kb: live_kb,
+            paths: vec![],
+            proof: Some(
+                live.iter()
+                    .map(|d| format!("{}  ·  {}", detail(d), d.udid))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
+            action: ActionKind::Explain,
+            command_display: None,
+        });
+    }
+
+    // --- runtime images under /Library: root-owned, report only -------------
+    let volumes = simulators::runtime_volumes();
+    let volumes_kb: u64 = volumes.iter().map(|(_, kb)| kb).sum();
+    if volumes_kb >= 1024 {
+        out.push(Card {
+            id: "xcode-sim-runtimes".into(),
+            title: "iOS runtime images".into(),
+            description: "Full OS images backing the simulators, installed under /Library and owned by root. Alpheus never writes outside your home folder, so this one is yours to run — remove a runtime from Xcode → Settings → Components, or delete the listed path with sudo.".into(),
+            tier: Tier::Manual,
+            size_kb: volumes_kb,
+            paths: volumes
+                .iter()
+                .map(|(p, _)| p.to_string_lossy().to_string())
+                .collect(),
+            proof: Some(
+                volumes
+                    .iter()
+                    .map(|(p, kb)| format!("{}  ·  {}", fmt(*kb), p.display()))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
+            action: ActionKind::Explain,
+            command_display: None,
+        });
+    }
+
+    out
+}
+
 // ---------------------------------------------------------------- platform dev (Xcode / Linux)
 
 fn scan_platform_dev() -> Vec<Card> {
@@ -462,23 +610,7 @@ fn scan_platform_dev() -> Vec<Card> {
             }
         }
 
-        let sims = home().join("Library/Developer/CoreSimulator/Devices");
-        if sims.exists() {
-            let kb = du_kb(&sims);
-            if kb >= 1024 {
-                out.push(Card {
-                    id: "xcode-simulators".into(),
-                    title: "iOS Simulators".into(),
-                    description: "Simulator devices, each carrying a full OS image. This action only deletes simulators marked unavailable or broken.".into(),
-                    tier: Tier::WithCare,
-                    size_kb: kb,
-                    paths: vec![sims.to_string_lossy().to_string()],
-                    proof: None,
-                    action: ActionKind::Command,
-                    command_display: Some("xcrun simctl delete unavailable".into()),
-                });
-            }
-        }
+        out.extend(scan_simulators());
     }
 
     // Linux Yay / AUR Cache
@@ -562,7 +694,19 @@ fn scan_caches() -> Vec<Card> {
     // Linux XDG ~/.cache
     let linux_caches = h.join(".cache");
     if linux_caches.exists() && !mac_caches.exists() {
-        let excluded = ["yay", "ms-playwright", "spotify", "colima", "pnpm", "go-build", "pip", "uv", "pypoetry", "huggingface", "torch"];
+        let excluded = [
+            "yay",
+            "ms-playwright",
+            "spotify",
+            "colima",
+            "pnpm",
+            "go-build",
+            "pip",
+            "uv",
+            "pypoetry",
+            "huggingface",
+            "torch",
+        ];
         let mut subs: Vec<PathBuf> = vec![];
         if let Ok(rd) = fs::read_dir(&linux_caches) {
             for e in rd.flatten() {
@@ -900,7 +1044,9 @@ fn scan_commands() -> Vec<Card> {
                 out.push(Card {
                     id: "flatpak-unused".into(),
                     title: format!("Unused Flatpak runtimes ({} found)", lines.len()),
-                    description: "Old Flatpak runtimes no longer required by any installed application.".into(),
+                    description:
+                        "Old Flatpak runtimes no longer required by any installed application."
+                            .into(),
                     tier: Tier::Safe,
                     size_kb: 0,
                     paths: vec![],
