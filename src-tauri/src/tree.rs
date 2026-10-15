@@ -50,6 +50,8 @@ pub struct View {
 
 pub struct Tree {
     nodes: Mutex<Vec<Node>>,
+    /// The remainder node and the total the whole tree must add up to.
+    budget: Mutex<Option<(NodeId, u64)>>,
 }
 
 impl Tree {
@@ -66,6 +68,7 @@ impl Tree {
                 own: 0,
                 state: State::Pending,
             }]),
+            budget: Mutex::new(None),
         }
     }
 
@@ -88,6 +91,26 @@ impl Tree {
         id
     }
 
+    /// A node whose size is already known (an APFS volume): done, with
+    /// nothing to walk.
+    pub fn add_measured(&self, parent: NodeId, name: &str, bytes: u64) -> NodeId {
+        let id = self.add(parent, name, 0);
+        let mut n = self.nodes.lock().unwrap();
+        n[id].own = bytes;
+        n[id].state = State::Done;
+        id
+    }
+
+    /// A node holding whatever `budget` leaves once everything else in the
+    /// tree is counted, so the root always adds up to `budget`. It shrinks as
+    /// walks measure more, and stops at zero.
+    pub fn add_remainder(&self, parent: NodeId, name: &str, budget: u64) -> NodeId {
+        let id = self.add(parent, name, 0);
+        self.nodes.lock().unwrap()[id].state = State::Done;
+        *self.budget.lock().unwrap() = Some((id, budget));
+        id
+    }
+
     pub fn set_state(&self, id: NodeId, state: State) {
         self.nodes.lock().unwrap()[id].state = state;
     }
@@ -96,17 +119,27 @@ impl Tree {
     /// first and capped at `top`.
     pub fn snapshot(&self, focus: NodeId, levels: usize, top: usize) -> View {
         let n = self.nodes.lock().unwrap();
-        let mut total: Vec<u64> = n.iter().map(|x| x.own).collect();
+        let mut own: Vec<u64> = n.iter().map(|x| x.own).collect();
+        let mut total = own.clone();
         for i in (1..n.len()).rev() {
             if let Some(p) = n[i].parent {
                 total[p] += total[i];
             }
         }
-        view(&n, &total, focus, levels, top)
+        if let Some((rem, budget)) = *self.budget.lock().unwrap() {
+            let fill = budget.saturating_sub(total[Self::ROOT]);
+            own[rem] = fill;
+            let mut up = Some(rem);
+            while let Some(i) = up {
+                total[i] += fill;
+                up = n[i].parent;
+            }
+        }
+        view(&n, &own, &total, focus, levels, top)
     }
 }
 
-fn view(n: &[Node], total: &[u64], id: NodeId, levels: usize, top: usize) -> View {
+fn view(n: &[Node], own: &[u64], total: &[u64], id: NodeId, levels: usize, top: usize) -> View {
     let node = &n[id];
     let mut kids = node.children.clone();
     kids.sort_by(|a, b| total[*b].cmp(&total[*a]).then(n[*a].name.cmp(&n[*b].name)));
@@ -116,11 +149,11 @@ fn view(n: &[Node], total: &[u64], id: NodeId, levels: usize, top: usize) -> Vie
         id,
         name: node.name.clone(),
         bytes: total[id],
-        own_bytes: node.own,
+        own_bytes: own[id],
         state: state(n, id),
         children: shown
             .iter()
-            .map(|c| view(n, total, *c, levels - 1, top))
+            .map(|c| view(n, own, total, *c, levels - 1, top))
             .collect(),
         other_count: rest.len(),
         other_bytes: rest.iter().map(|c| total[*c]).sum(),

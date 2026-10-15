@@ -8,6 +8,7 @@ pub mod analyze;
 pub mod apfs;
 pub mod breakdown;
 pub mod browse;
+pub mod categories;
 pub mod disk;
 pub mod dupes;
 pub mod exec;

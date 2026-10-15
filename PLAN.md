@@ -53,7 +53,7 @@ One item per step, test first. Stop and ask at each gate.
       unreadable count, cancel flag
 - [x] A3 Progressive tree: breadth-first scheduler, throttled snapshots;
       totals only grow; final total matches `du` within 1%
-- [ ] A4 Category map, as in System Settings → Storage (design item 2)
+- [x] A4 Category map, as in System Settings → Storage (design item 2)
 - [ ] A5 Background QoS, Tauri commands and events (start, cancel, cached),
       cache file
 - [ ] **Gate A**: time the reclaim scan with and without a walk running; idle CPU
