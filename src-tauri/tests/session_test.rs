@@ -163,3 +163,58 @@ fn test_unknown_focus_id_is_ignored() {
     assert!(s.payload().focus.is_none());
     let _ = fs::remove_dir_all(d);
 }
+
+/// Gate A, run by hand: `cargo test --release --test session_test gate_a --
+/// --ignored --nocapture`. Times the reclaim scan alone and while a whole-disk
+/// walk runs (medians of three), and how long that walk takes at utility QoS.
+#[cfg(target_os = "macos")]
+#[test]
+#[ignore]
+fn gate_a() {
+    use std::time::Instant;
+    let time_scan = || {
+        let t = Instant::now();
+        let n = scan::scan_all().len();
+        (t.elapsed(), n)
+    };
+    let median = |mut v: Vec<Duration>| {
+        v.sort();
+        v[v.len() / 2]
+    };
+    time_scan(); // warm the caches the way a second scan in the app would
+
+    let alone: Vec<Duration> = (0..3).map(|_| time_scan().0).collect();
+
+    let t = Instant::now();
+    let s = Session::start(
+        PathBuf::from("/System/Volumes/Data"),
+        scan::home(),
+        alpheus_lib::apfs::read_root(),
+        Duration::from_millis(200),
+        |_| {},
+    );
+    let mut during = vec![];
+    while s.running() && during.len() < 3 {
+        during.push(time_scan().0);
+    }
+    s.wait();
+    let walk = t.elapsed();
+    let p = s.payload();
+
+    eprintln!(
+        "reclaim scan alone:        {:?}  {alone:?}",
+        median(alone.clone())
+    );
+    if during.is_empty() {
+        eprintln!("walk ended before a scan could overlap it");
+    } else {
+        eprintln!(
+            "reclaim scan during walk:  {:?}  {during:?}",
+            median(during.clone())
+        );
+    }
+    eprintln!(
+        "whole-disk walk at utility QoS: {walk:?}, {} files, {} unreadable",
+        p.files, p.unreadable
+    );
+}

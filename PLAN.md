@@ -56,7 +56,12 @@ One item per step, test first. Stop and ask at each gate.
 - [x] A4 Category map, as in System Settings → Storage (design item 2)
 - [x] A5 Background QoS (utility class, see Gate A), Tauri commands and events (start, cancel, cached),
       cache file
-- [ ] **Gate A**: time the reclaim scan with and without a walk running; idle CPU
+- [x] **Gate A** (2026-10-15, load average ~8 from other sessions): reclaim scan
+      alone 18.7 s median (18.7 / 19.0 / 13.4), during a whole-disk walk 13.8 s
+      (14.0 / 13.8 / 13.3): no measurable slowdown. Whole-disk walk at utility QoS
+      41 s (35.5 s at default), 1.77M files, 195 unreadable folders. Nothing runs
+      after a walk ends: its threads are joined. Rerun: `cargo test --release
+      --test session_test gate_a -- --ignored --nocapture`
 
 ### Phase B: UI
 - [ ] B1 `useBreakdown` hook: events into state, never blocks other views
