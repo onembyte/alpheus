@@ -41,8 +41,9 @@ const FIVE_GB_KB: u64 = 5 * 1024 * 1024;
 
 /// Cards whose targets are known-regenerable and may be rm'd outright when the
 /// total is ≥ 5 GB (HANDOFF rule). iphone-backups is deliberately absent —
-/// backups always go through the Trash no matter the size.
-const RM_ALLOWED: &[&str] = &[
+/// backups always go through the Trash no matter the size, and so does every
+/// card that needs review (old app builds, Ollama models).
+pub const RM_ALLOWED: &[&str] = &[
     "node-modules-verified",
     "node-modules-unverified",
     "next-builds",

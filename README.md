@@ -62,6 +62,8 @@ Finding and cleaning them usually means running messy, unsafe `du` and `find -de
   - **App Scratch & Caches**: `~/.cache` (Linux) and `~/Library/Caches` (macOS), Spotify cache, VS Code cached extensions.
   - **Stale Downloads**: Unaccessed large files in `~/Downloads` untouched for >30 days.
   - **macOS Specific**: Xcode DerivedData, iOS DeviceSupport symbols, iOS Simulators, Time Machine APFS snapshots.
+  - **Superseded Builds** (review before removing): old Autodesk Fusion builds and Codex app-server releases left beside the current one, which is read from the updater's own markers and always kept; Feedback Assistant sysdiagnose bundles.
+  - **Ollama Models** (review before removing): one card per local model, sized from the layers only that model uses — layers shared with another model are kept.
   - **Trash**: FreeDesktop Trash (`~/.local/share/Trash`) and macOS Trash (`~/.Trash`).
 
 - **Proven Safe Before Deleting**:

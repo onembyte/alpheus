@@ -11,12 +11,14 @@ pub mod dupes;
 pub mod exec;
 pub mod google;
 pub mod history;
+pub mod ollama;
 pub mod rules;
 pub mod scan;
 pub mod settings;
 #[cfg(target_os = "macos")]
 pub mod simulators;
 pub mod snapshot;
+pub mod superseded;
 
 use std::collections::HashMap;
 use std::sync::Mutex;

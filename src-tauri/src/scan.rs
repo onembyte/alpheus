@@ -97,6 +97,18 @@ pub fn du_many_kb(paths: &[PathBuf]) -> HashMap<PathBuf, u64> {
     map
 }
 
+/// Last-modified day of a path, for proof lines.
+pub fn modified_day(p: &Path) -> String {
+    fs::metadata(p)
+        .and_then(|m| m.modified())
+        .map(|t| {
+            chrono::DateTime::<chrono::Local>::from(t)
+                .format("%Y-%m-%d")
+                .to_string()
+        })
+        .unwrap_or_else(|_| "unknown date".into())
+}
+
 pub fn du_kb(path: &Path) -> u64 {
     du_many_kb(&[path.to_path_buf()])
         .values()
@@ -106,23 +118,23 @@ pub fn du_kb(path: &Path) -> u64 {
 }
 
 pub fn scan_all() -> Vec<Card> {
-    let (a, b, c, d, e, f) = std::thread::scope(|s| {
-        let h1 = s.spawn(scan_projects);
-        let h2 = s.spawn(scan_platform_dev);
-        let h3 = s.spawn(scan_caches);
-        let h4 = s.spawn(scan_simple);
-        let h5 = s.spawn(scan_commands);
-        let h6 = s.spawn(scan_stale_downloads);
-        (
-            h1.join().unwrap_or_default(),
-            h2.join().unwrap_or_default(),
-            h3.join().unwrap_or_default(),
-            h4.join().unwrap_or_default(),
-            h5.join().unwrap_or_default(),
-            h6.join().unwrap_or_default(),
-        )
+    let scanners: [fn() -> Vec<Card>; 8] = [
+        scan_projects,
+        scan_platform_dev,
+        scan_caches,
+        scan_simple,
+        scan_commands,
+        scan_stale_downloads,
+        crate::superseded::scan,
+        crate::ollama::scan,
+    ];
+    let mut cards: Vec<Card> = std::thread::scope(|s| {
+        let handles: Vec<_> = scanners.iter().map(|f| s.spawn(*f)).collect();
+        handles
+            .into_iter()
+            .flat_map(|h| h.join().unwrap_or_default())
+            .collect()
     });
-    let mut cards: Vec<Card> = [a, b, c, d, e, f].into_iter().flatten().collect();
     cards.sort_by_key(|c| std::cmp::Reverse(c.size_kb));
     cards
 }
