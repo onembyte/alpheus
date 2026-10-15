@@ -49,7 +49,7 @@ One item per step, test first. Stop and ask at each gate.
 
 ### Phase A: engine (Rust, no UI)
 - [x] A1 APFS volume reader: parse `diskutil apfs list -plist` into OS / Data
-- [ ] A2 Walker: allocated size, hard-link dedup, no symlinks, one volume,
+- [x] A2 Walker: allocated size, hard-link dedup, no symlinks, one volume,
       unreadable count, cancel flag
 - [ ] A3 Progressive tree: breadth-first scheduler, throttled snapshots;
       totals only grow; final total matches `du` within 1%

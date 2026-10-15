@@ -20,6 +20,7 @@ pub mod settings;
 pub mod simulators;
 pub mod snapshot;
 pub mod superseded;
+pub mod walker;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
