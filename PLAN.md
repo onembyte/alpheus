@@ -96,7 +96,15 @@ background. Proposed; waiting for Franco's go-ahead on the format.
       System Data
 - [x] S3 Snapshot cards show at once but act only after the fresh scan (the
       backend already refuses ids the last live scan didn't produce)
-- [ ] **Gate S**: launch after a reboot-like cold start, screenshots
+- [x] **Gate S** (2026-10-15): release build launched from the snapshot. Window in
+      0.7-1.5 s; by 2.1-2.6 s it shows the kept cards ("Last scan … · refreshing ·
+      actions unlock when it finishes") and every storage row at its kept size,
+      marked updating; the end state shows live cards and "Measured …". The
+      snapshot file is 20-85 KB. Found and fixed on the way: breakdown_locate ran
+      on the main thread and stalled the window under heavy load (66c9873); every
+      walk payload re-rendered the whole app and could build a backlog (8fb4149).
+      Late screenshots of a window behind others show its last painted frame:
+      bring it to the front before judging it.
 
 ### Phase C: release (only when asked)
 - [ ] Version bump to **0.9.1** (Franco, 2026-10-15), universal DMG, release
