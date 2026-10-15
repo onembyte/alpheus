@@ -5,6 +5,7 @@
 //! or buggy webview cannot ask the backend to delete arbitrary paths.
 
 pub mod analyze;
+pub mod apfs;
 pub mod browse;
 pub mod disk;
 pub mod dupes;

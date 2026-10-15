@@ -43,11 +43,12 @@ fast. Read-only: nothing in this view deletes; removal still goes through cards.
 One item per step, test first. Stop and ask at each gate.
 
 ### Before: finish the open work
-- [ ] Offload verified on the NAS; local copies removed (with approval)
-- [ ] Tests pass for the four new cards (Fusion, Codex, diagnostics, Ollama); commit
+- [x] Offload verified on the NAS; local copies removed (with approval).
+      Open: WorkSpaces and UniFi are root-owned and wait for Franco's admin password
+- [x] Tests pass for the four new cards (Fusion, Codex, diagnostics, Ollama); commit
 
 ### Phase A: engine (Rust, no UI)
-- [ ] A1 APFS volume reader: parse `diskutil apfs list -plist` into OS / Data
+- [x] A1 APFS volume reader: parse `diskutil apfs list -plist` into OS / Data
 - [ ] A2 Walker: allocated size, hard-link dedup, no symlinks, one volume,
       unreadable count, cancel flag
 - [ ] A3 Progressive tree: breadth-first scheduler, throttled snapshots;
