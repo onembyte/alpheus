@@ -56,3 +56,33 @@ export interface AppSettings {
   last_auto_scan_ts: number;
   menu_bar_only: boolean;
 }
+
+/** Storage detail: one node of the live tree (Rust `tree::View`). */
+export type NodeState = "pending" | "measuring" | "done";
+
+export interface BreakdownNode {
+  id: number;
+  name: string;
+  /** The whole subtree, in bytes of allocated blocks. */
+  bytes: number;
+  own_bytes: number;
+  state: NodeState;
+  /** Biggest first, capped; the rest is summed in other_*. */
+  children: BreakdownNode[];
+  other_count: number;
+  other_bytes: number;
+}
+
+/** What each `breakdown` event carries (Rust `breakdown::Payload`). */
+export interface BreakdownPayload {
+  /** The category rows, one level deep. */
+  root: BreakdownNode;
+  /** The opened row with its children, when the user drilled in. */
+  focus: BreakdownNode | null;
+  files: number;
+  unreadable: number;
+  running: boolean;
+  /** Unix seconds. */
+  started: number;
+  finished: number | null;
+}

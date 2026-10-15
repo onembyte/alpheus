@@ -64,7 +64,7 @@ One item per step, test first. Stop and ask at each gate.
       --test session_test gate_a -- --ignored --nocapture`
 
 ### Phase B: UI
-- [ ] B1 `useBreakdown` hook: events into state, never blocks other views
+- [x] B1 `useBreakdown` hook: events into state, never blocks other views
 - [ ] B2 Storage detail section: category rows, live sizes, measuring state
 - [ ] B3 Drill-down with breadcrumb while the walk continues. The tree keeps
       3 levels below each walked folder (keeping every folder would hold
