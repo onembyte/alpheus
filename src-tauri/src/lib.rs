@@ -146,6 +146,33 @@ fn breakdown_focus(id: Option<usize>, slot: State<Slot>) -> Option<Payload> {
     Some(s.payload())
 }
 
+/// Where each path sits in the storage detail tree, as the chain of rows
+/// holding it. Read-only: it links rows to reclaim cards, which still delete
+/// only through their own id.
+#[tauri::command]
+fn breakdown_locate(paths: Vec<String>, slot: State<Slot>) -> Vec<Vec<usize>> {
+    let paths: Vec<std::path::PathBuf> = paths.into_iter().map(Into::into).collect();
+    slot.current()
+        .map(|s| s.locate(&paths))
+        .unwrap_or_else(|| vec![vec![]; paths.len()])
+}
+
+/// Opens System Settings at Privacy & Security → Full Disk Access. A fixed
+/// URL: nothing from the webview reaches the command.
+#[tauri::command]
+fn open_full_disk_access() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("/usr/bin/open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
+            .status()
+            .map_err(|e| e.to_string())
+            .map(|_| ())
+    }
+    #[cfg(not(target_os = "macos"))]
+    Err("Full Disk Access is a macOS setting".into())
+}
+
 #[tauri::command]
 fn breakdown_cancel(slot: State<Slot>) {
     if let Some(s) = slot.current() {
@@ -285,6 +312,8 @@ pub fn run() {
             breakdown_start,
             breakdown_focus,
             breakdown_cancel,
+            breakdown_locate,
+            open_full_disk_access,
             breakdown_cached
         ])
         .setup(|app| {

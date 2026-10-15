@@ -272,3 +272,29 @@ fn test_path_from_the_nearest_job() {
     assert_eq!(tree.path_from(Tree::ROOT, &jobs), None, "above every job");
     let _ = fs::remove_dir_all(root);
 }
+
+/// Where a path sits in the tree: the job holding it, then its kept folders
+/// by name, as far down as the tree goes. Reclaim cards are linked to the
+/// rows that hold all their paths this way.
+#[test]
+fn test_locate_a_path_down_the_kept_folders() {
+    let root = sample("locate");
+    let tree = Tree::new("Disk");
+    let cat = tree.add(Tree::ROOT, "Apps", 0);
+    let job = tree.add(cat, "apps", 1);
+    walker::walk(&root.join("apps"), job, &tree, &Shared::default());
+    let jobs = std::collections::HashMap::from([(job, root.join("apps"))]);
+    let b = find(&tree.snapshot(job, 1, 50), "b").id;
+
+    // b/x is folded into b (kept depth 1): the chain stops at b.
+    assert_eq!(
+        tree.locate(&root.join("apps/b/x/mid.bin"), &jobs),
+        vec![Tree::ROOT, cat, job, b]
+    );
+    assert_eq!(
+        tree.locate(&root.join("apps"), &jobs),
+        vec![Tree::ROOT, cat, job]
+    );
+    assert!(tree.locate(&root.join("elsewhere"), &jobs).is_empty());
+    let _ = fs::remove_dir_all(root);
+}

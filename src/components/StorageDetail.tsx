@@ -1,6 +1,9 @@
 import type { Crumb, Row, Screen } from "../breakdown/state";
+import type { Link } from "../breakdown/links";
+import { accessNotice } from "../breakdown/links";
 import { categoryColor, statusLine } from "../breakdown/present";
-import { fmtBytes } from "../format";
+import { fmtBytes, fmtKB } from "../format";
+import type { Card } from "../types";
 
 interface Props {
   screen: Screen;
@@ -8,6 +11,11 @@ interface Props {
   onOpen: (crumb: Crumb) => void;
   /** Back to the breadcrumb at `to`; -1 is the top. */
   onUp: (to: number) => void;
+  /** Reclaim cards each row holds entirely, by row id. */
+  links: Map<number, Link>;
+  /** Opens a card's review sheet: the only way anything here gets removed. */
+  onReclaim: (card: Card) => void;
+  onFullDiskAccess: () => void;
 }
 
 function Spinner() {
@@ -49,7 +57,15 @@ function Chevron({ left = false }: { left?: boolean }) {
  * measured live by the backend. Rows open while the walk runs. Read-only:
  * removing things is the cards' job.
  */
-export default function StorageDetail({ screen: s, onOpen, onUp }: Props) {
+export default function StorageDetail({
+  screen: s,
+  onOpen,
+  onUp,
+  links,
+  onReclaim,
+  onFullDiskAccess,
+}: Props) {
+  const notice = accessNotice(s.unreadable);
   const top = s.crumbs.length === 0;
   // Inside a category every row wears the category's color.
   const colorOf = (r: Row) => categoryColor(top ? r.name : s.crumbs[0].name);
@@ -145,7 +161,15 @@ export default function StorageDetail({ screen: s, onOpen, onUp }: Props) {
 
       <div className="mt-1.5">
         {s.rows.map((r) => (
-          <DetailRow key={r.id} row={r} max={max} color={colorOf(r)} onOpen={onOpen} />
+          <DetailRow
+            key={r.id}
+            row={r}
+            max={max}
+            color={colorOf(r)}
+            link={links.get(r.id)}
+            onOpen={onOpen}
+            onReclaim={onReclaim}
+          />
         ))}
         {s.filesHere !== null && (
           <div className="hairline-b flex items-center gap-3.5 py-2 last:border-0">
@@ -185,6 +209,27 @@ export default function StorageDetail({ screen: s, onOpen, onUp }: Props) {
           </div>
         )}
       </div>
+
+      {notice && top && (
+        <div
+          className="mb-2.5 mt-1.5 flex items-center gap-3 rounded-[13px] px-3.5 py-2.5"
+          style={{
+            background: "color-mix(in srgb, var(--warn) 10%, transparent)",
+            boxShadow: "0 0 0 1px color-mix(in srgb, var(--warn) 24%, transparent)",
+          }}
+        >
+          <span className="min-w-0 flex-1 text-[11.5px] leading-snug" style={{ color: "var(--txt2)" }}>
+            {notice}
+          </span>
+          <button
+            onClick={onFullDiskAccess}
+            className="glass-chip btn-focus h-7 flex-none rounded-lg px-3 text-[11px] font-semibold"
+            style={{ color: "var(--txt)" }}
+          >
+            Open Privacy settings
+          </button>
+        </div>
+      )}
     </section>
   );
 }
@@ -193,13 +238,18 @@ function DetailRow({
   row: r,
   max,
   color,
+  link,
   onOpen,
+  onReclaim,
 }: {
   row: Row;
   max: number;
   color: string;
+  link: Link | undefined;
   onOpen: (crumb: Crumb) => void;
+  onReclaim: (card: Card) => void;
 }) {
+  const open = () => onOpen({ id: r.id, name: r.name });
   const measuring = r.state !== "done";
   const body = (
     <>
@@ -240,6 +290,23 @@ function DetailRow({
           />
         )}
       </div>
+      {link && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onReclaim(link.cards[0]);
+          }}
+          title={link.cards.map((c) => `${c.title} — ${fmtKB(c.size_kb)}`).join("\n")}
+          className="btn-focus h-6 flex-none rounded-md px-2 text-[10.5px] font-semibold"
+          style={{
+            color: "var(--good)",
+            background: "color-mix(in srgb, var(--good) 12%, transparent)",
+            boxShadow: "0 0 0 1px color-mix(in srgb, var(--good) 26%, transparent)",
+          }}
+        >
+          {fmtKB(link.kb)} reclaimable
+        </button>
+      )}
       <div className="flex w-[86px] flex-none items-center justify-end gap-1.5">
         {measuring && <Spinner />}
         <span
@@ -255,14 +322,23 @@ function DetailRow({
     </>
   );
 
+  // A div, not a button: the reclaim chip inside it is a button of its own.
   return r.openable ? (
-    <button
-      onClick={() => onOpen({ id: r.id, name: r.name })}
-      className="hairline-b btn-focus -mx-2 flex w-[calc(100%+1rem)] items-center gap-3.5 rounded-lg px-2 py-2 transition-colors last:border-0 hover:bg-(--track)"
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open();
+        }
+      }}
+      className="hairline-b btn-focus -mx-2 flex cursor-pointer items-center gap-3.5 rounded-lg px-2 py-2 transition-colors last:border-0 hover:bg-(--track)"
       title={`Open ${r.name}`}
     >
       {body}
-    </button>
+    </div>
   ) : (
     <div className="hairline-b flex items-center gap-3.5 py-2 last:border-0">{body}</div>
   );

@@ -14,7 +14,7 @@ use crate::walker::Sink;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 pub type NodeId = usize;
@@ -196,6 +196,41 @@ impl Tree {
         n[id].track_to = n[s].track_to;
         n[id].folded = n[s].folded;
         n[id].state = State::Done;
+    }
+
+    /// The rows holding `path`, from the root down: the job whose folder
+    /// contains it (the deepest, if jobs nest), then its kept folders by name
+    /// as far as the tree goes. Empty when no job holds it.
+    pub fn locate(&self, path: &Path, jobs: &HashMap<NodeId, PathBuf>) -> Vec<NodeId> {
+        let Some((job, root)) = jobs
+            .iter()
+            .filter(|(_, p)| path.starts_with(p))
+            .max_by_key(|(_, p)| p.components().count())
+        else {
+            return vec![];
+        };
+        let n = self.nodes.lock().unwrap();
+        let mut chain = vec![];
+        let mut at = Some(*job);
+        while let Some(i) = at {
+            chain.push(i);
+            at = n[i].parent;
+        }
+        chain.reverse();
+        let mut here = *job;
+        for part in path
+            .strip_prefix(root)
+            .into_iter()
+            .flat_map(Path::components)
+        {
+            let name = part.as_os_str().to_string_lossy();
+            let Some(next) = n[here].children.iter().find(|c| n[**c].name == name) else {
+                break;
+            };
+            chain.push(*next);
+            here = *next;
+        }
+        chain
     }
 
     /// The folder `id` stands for: the nearest job's path (`jobs` maps job

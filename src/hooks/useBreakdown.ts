@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import * as api from "../api";
+import { cardLinks, type Link } from "../breakdown/links";
 import { initial, reduce, screen, type Crumb } from "../breakdown/state";
-import type { BreakdownPayload } from "../types";
+import type { BreakdownPayload, Card } from "../types";
 
 /**
  * Storage detail. The walk runs in the backend at low priority; this hook
  * only folds its payloads into state (see `breakdown/state`), so nothing here
  * waits on the disk and every other view stays responsive while it measures.
  */
-export function useBreakdown() {
+export function useBreakdown(cards: Card[] | null) {
   const [state, dispatch] = useReducer(reduce, initial);
+  const [links, setLinks] = useState<Map<number, Link>>(() => new Map());
   const path = useRef(state.path);
   path.current = state.path;
 
@@ -60,5 +62,38 @@ export function useBreakdown() {
     [apply],
   );
 
-  return { screen: useMemo(() => screen(state), [state]), start, cancel, open, up };
+  const view = useMemo(() => screen(state), [state]);
+
+  // Link rows to the reclaim cards they hold. Re-located whenever there are
+  // rows the last answer couldn't know: new cards, a new walk, the walk
+  // ending, a row opened, a folder measured on demand.
+  const session = state.live?.started ?? null;
+  const running = state.live?.running ?? false;
+  const depth = state.path.length;
+  const busyHere = view.measuringHere;
+  useEffect(() => {
+    if (!cards || session === null) {
+      setLinks(new Map());
+      return;
+    }
+    const paths = [...new Set(cards.flatMap((c) => c.paths))];
+    let stale = false;
+    api
+      .breakdownLocate(paths)
+      .then((chains) => {
+        if (stale) return;
+        const byPath = Object.fromEntries(paths.map((p, i) => [p, chains[i] ?? []]));
+        setLinks(cardLinks(cards, byPath));
+      })
+      .catch(() => {});
+    return () => {
+      stale = true;
+    };
+  }, [cards, session, running, depth, busyHere]);
+
+  const openFullDiskAccess = useCallback(() => {
+    api.openFullDiskAccess().catch(() => {});
+  }, []);
+
+  return { screen: view, links, start, cancel, open, up, openFullDiskAccess };
 }

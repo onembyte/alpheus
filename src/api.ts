@@ -25,3 +25,7 @@ export const breakdownFocus = (id: number | null) =>
   invoke<BreakdownPayload | null>("breakdown_focus", { id });
 export const breakdownCancel = () => invoke<void>("breakdown_cancel");
 export const breakdownCached = () => invoke<BreakdownPayload | null>("breakdown_cached");
+/** For each path, the storage detail rows holding it (root first). */
+export const breakdownLocate = (paths: string[]) =>
+  invoke<number[][]>("breakdown_locate", { paths });
+export const openFullDiskAccess = () => invoke<void>("open_full_disk_access");

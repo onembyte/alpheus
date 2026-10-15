@@ -292,3 +292,33 @@ fn test_opening_past_the_kept_depth_measures_it() {
     assert_eq!(opened.bytes, c.bytes, "the total didn't move");
     let _ = fs::remove_dir_all(d);
 }
+
+/// Card paths are written the way the user sees them (/Users/…), while the
+/// walk runs on the Data volume's own paths; locating has to match both.
+#[test]
+fn test_locate_maps_user_paths_onto_the_data_volume() {
+    let d = data_volume("locate");
+    let s = start(&d, Arc::default());
+    s.wait();
+    let chains = s.locate(&[
+        PathBuf::from("/Users/me/.cargo/registry"),
+        d.join("Users/me/Documents/a.pdf"),
+        PathBuf::from("/nowhere/at/all"),
+    ]);
+    assert_eq!(chains.len(), 3);
+    let p = s.payload();
+    let developer = p
+        .root
+        .children
+        .iter()
+        .find(|c| c.name == "Developer")
+        .unwrap();
+    assert!(
+        chains[0].contains(&developer.id),
+        "the cargo path sits under Developer"
+    );
+    assert!(chains[0].len() >= 4, "root, category, .cargo, registry");
+    assert!(!chains[1].is_empty());
+    assert!(chains[2].is_empty());
+    let _ = fs::remove_dir_all(d);
+}

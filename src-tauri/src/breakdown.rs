@@ -95,6 +95,8 @@ struct Core {
     shared: Arc<Shared>,
     /// Folder each job node was walked from, to find a node's path on disk.
     paths: HashMap<NodeId, PathBuf>,
+    /// Where the Data volume is mounted (`/System/Volumes/Data` on macOS).
+    data: PathBuf,
     focus: Mutex<Option<NodeId>>,
     finished: Mutex<Option<u64>>,
     started: u64,
@@ -158,6 +160,7 @@ impl Session {
             tree,
             shared: Arc::new(Shared::default()),
             paths: jobs.iter().map(|(p, id)| (*id, p.clone())).collect(),
+            data,
             focus: Mutex::new(None),
             finished: Mutex::new(None),
             started: now(),
@@ -252,6 +255,24 @@ impl Session {
 
     pub fn payload(&self) -> Payload {
         self.core.payload()
+    }
+
+    /// For each path, the rows holding it from the root down (empty when the
+    /// walk doesn't cover it). Paths may be written as the user sees them
+    /// (`/Users/…`) or on the Data volume itself.
+    pub fn locate(&self, paths: &[PathBuf]) -> Vec<Vec<NodeId>> {
+        let c = &self.core;
+        paths
+            .iter()
+            .map(|p| {
+                let direct = c.tree.locate(p, &c.paths);
+                if !direct.is_empty() {
+                    return direct;
+                }
+                let on_data = c.data.join(p.strip_prefix("/").unwrap_or(p));
+                c.tree.locate(&on_data, &c.paths)
+            })
+            .collect()
     }
 
     /// The result as cached for the next launch: two levels, so the preview
