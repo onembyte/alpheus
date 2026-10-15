@@ -44,7 +44,7 @@ One item per step, test first. Stop and ask at each gate.
 
 ### Before: finish the open work
 - [x] Offload verified on the NAS; local copies removed (with approval).
-      Open: WorkSpaces and UniFi are root-owned and wait for Franco's admin password
+      WorkSpaces and UniFi (root-owned) removed by Franco with his admin password
 - [x] Tests pass for the four new cards (Fusion, Codex, diagnostics, Ollama); commit
 
 ### Phase A: engine (Rust, no UI)
