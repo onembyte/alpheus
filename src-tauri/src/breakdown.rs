@@ -286,17 +286,23 @@ impl Session {
     /// (`/Users/…`) or on the Data volume itself.
     pub fn locate(&self, paths: &[PathBuf]) -> Vec<Vec<NodeId>> {
         let c = &self.core;
-        paths
+        let mut chains = c.tree.locate_all(paths, &c.paths);
+        // Paths the walk doesn't hold as written: try them on the Data volume.
+        let missing: Vec<usize> = (0..paths.len()).filter(|i| chains[*i].is_empty()).collect();
+        let on_data: Vec<PathBuf> = missing
             .iter()
-            .map(|p| {
-                let direct = c.tree.locate(p, &c.paths);
-                if !direct.is_empty() {
-                    return direct;
-                }
-                let on_data = c.data.join(p.strip_prefix("/").unwrap_or(p));
-                c.tree.locate(&on_data, &c.paths)
+            .map(|i| {
+                c.data
+                    .join(paths[*i].strip_prefix("/").unwrap_or(&paths[*i]))
             })
-            .collect()
+            .collect();
+        for (i, chain) in missing
+            .into_iter()
+            .zip(c.tree.locate_all(&on_data, &c.paths))
+        {
+            chains[i] = chain;
+        }
+        chains
     }
 
     /// The result as kept for the next launch (see `last_state`): three

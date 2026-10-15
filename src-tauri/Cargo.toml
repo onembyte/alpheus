@@ -4,6 +4,8 @@ version = "0.9.0"
 description = "Honest storage pane for a chronically full MacBook"
 authors = ["Franco Michetti"]
 edition = "2021"
+# `cargo run` and `tauri dev` start the app, not the CLI.
+default-run = "alpheus"
 
 [lib]
 name = "alpheus_lib"

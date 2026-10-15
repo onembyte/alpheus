@@ -298,3 +298,23 @@ fn test_locate_a_path_down_the_kept_folders() {
     assert!(tree.locate(&root.join("elsewhere"), &jobs).is_empty());
     let _ = fs::remove_dir_all(root);
 }
+
+/// Locating many paths takes the tree's lock once, so linking hundreds of
+/// card paths doesn't queue behind the walkers path by path; the answers are
+/// the same as one at a time.
+#[test]
+fn test_locate_all_matches_locate_one_by_one() {
+    let root = sample("locate_all");
+    let tree = Tree::new("Disk");
+    let job = tree.add(Tree::ROOT, "apps", 2);
+    walker::walk(&root.join("apps"), job, &tree, &Shared::default());
+    let jobs = std::collections::HashMap::from([(job, root.join("apps"))]);
+    let paths = vec![
+        root.join("apps/b/x/mid.bin"),
+        root.join("apps/a"),
+        root.join("nowhere"),
+    ];
+    let one_by_one: Vec<_> = paths.iter().map(|p| tree.locate(p, &jobs)).collect();
+    assert_eq!(tree.locate_all(&paths, &jobs), one_by_one);
+    let _ = fs::remove_dir_all(root);
+}

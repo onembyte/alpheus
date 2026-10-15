@@ -78,7 +78,7 @@ fn scan(app: AppHandle, state: State<ScanState>) -> Vec<Card> {
 
 /// The cards of the last finished scan and when it ran, shown at launch
 /// before the new scan lands. Display only: actions need ids from a live scan.
-#[tauri::command]
+#[tauri::command(async)]
 fn cards_cached(app: AppHandle) -> Option<(Vec<Card>, u64)> {
     let s = last_state::load(&app.path().app_data_dir().ok()?);
     Some((s.cards?, s.cards_at?))
@@ -161,7 +161,7 @@ fn breakdown_start(app: AppHandle) -> Payload {
 
 /// Moves the focus (the row whose children travel with each payload) and
 /// returns a payload at once, so opening a row never waits for the next tick.
-#[tauri::command]
+#[tauri::command(async)]
 fn breakdown_focus(id: Option<usize>, slot: State<Slot>) -> Option<Payload> {
     let s = slot.current()?;
     s.set_focus(id);
@@ -171,7 +171,7 @@ fn breakdown_focus(id: Option<usize>, slot: State<Slot>) -> Option<Payload> {
 /// Where each path sits in the storage detail tree, as the chain of rows
 /// holding it. Read-only: it links rows to reclaim cards, which still delete
 /// only through their own id.
-#[tauri::command]
+#[tauri::command(async)]
 fn breakdown_locate(paths: Vec<String>, slot: State<Slot>) -> Vec<Vec<usize>> {
     let paths: Vec<std::path::PathBuf> = paths.into_iter().map(Into::into).collect();
     slot.current()
@@ -203,7 +203,7 @@ fn breakdown_cancel(slot: State<Slot>) {
 }
 
 /// The last finished walk, shown while a new one runs.
-#[tauri::command]
+#[tauri::command(async)]
 fn breakdown_cached(app: AppHandle) -> Option<Payload> {
     last_state::load(&app.path().app_data_dir().ok()?).breakdown
 }
