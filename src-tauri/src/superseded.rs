@@ -14,6 +14,7 @@ use crate::scan::{du_many_kb, home, is_denied, modified_day, ActionKind, Card, T
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{Duration, SystemTime};
 
 /// Every build of one app on disk, and the ones its markers say are in use.
 /// Both lists hold canonical paths, so they compare by value.
@@ -134,15 +135,44 @@ fn running_commands() -> Option<String> {
         .then(|| String::from_utf8_lossy(&out.stdout).to_string())
 }
 
-/// True while a sysdiagnose is being collected, or when that can't be checked.
-fn sysdiagnose_running() -> bool {
-    ["sysdiagnose", "sysdiagnosed"].iter().any(|name| {
-        Command::new("/usr/bin/pgrep")
-            .args(["-x", name])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(true)
-    })
+// ---------------------------------------------------------------- diagnostics
+
+/// How long a report must sit untouched before it counts as finished.
+const SETTLE: Duration = Duration::from_secs(30 * 60);
+
+/// Report folders under `dir` whose newest file is at least 30 minutes old.
+/// A report still being collected keeps gaining files, and `sysdiagnosed`
+/// never exits, so the files are the only honest signal. A report with any
+/// unreadable part is left out.
+pub fn diagnostic_reports(dir: &Path, now: SystemTime) -> Vec<PathBuf> {
+    let Ok(rd) = fs::read_dir(dir) else {
+        return vec![];
+    };
+    let mut out: Vec<PathBuf> = rd
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            matches!(newest_file(p), Ok(Some(t))
+                if now.duration_since(t).is_ok_and(|age| age >= SETTLE))
+        })
+        .collect();
+    out.sort();
+    out
+}
+
+/// Newest file modification time under `p`, symlinks not followed. Folders'
+/// own times are ignored: adding an entry touches them. `Ok(None)` when there
+/// are no files, `Err` when any part can't be read.
+fn newest_file(p: &Path) -> Result<Option<SystemTime>, ()> {
+    let meta = fs::symlink_metadata(p).map_err(drop)?;
+    if !meta.is_dir() {
+        return meta.modified().map(Some).map_err(drop);
+    }
+    let mut newest = None;
+    for e in fs::read_dir(p).map_err(drop)?.flatten() {
+        newest = newest.max(newest_file(&e.path())?);
+    }
+    Ok(newest)
 }
 
 fn name(p: &Path) -> String {
@@ -259,15 +289,12 @@ pub fn scan() -> Vec<Card> {
     }
 
     let diag = h.join("Library/Logs/com.apple.diagnosticextensionsd");
-    if diag.is_dir() && !sysdiagnose_running() {
-        let reports: Vec<PathBuf> = fs::read_dir(&diag)
-            .map(|rd| rd.flatten().map(|e| e.path()).collect())
-            .unwrap_or_default();
+    if diag.is_dir() {
         out.extend(card(
             "diagnostic-reports",
             "Feedback Assistant diagnostics",
-            "System diagnostics (sysdiagnose) macOS collected for a Feedback Assistant report. Once that report is sent, this is only a local copy. Check it went through before removing.",
-            reports,
+            "System diagnostics (sysdiagnose) macOS collected for a Feedback Assistant report. Once that report is sent, this is only a local copy. Check it went through before removing. A report still being written is not listed.",
+            diagnostic_reports(&diag, SystemTime::now()),
             vec![],
             name,
         ));

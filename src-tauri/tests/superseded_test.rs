@@ -262,3 +262,30 @@ fn test_live_scan_never_offers_a_current_build() {
         }
     }
 }
+
+// ---------------------------------------------------------------- diagnostics
+
+/// A report still being written must not be offered. `sysdiagnosed` is a
+/// daemon that never exits, so "is it running" says nothing; the files do.
+#[test]
+fn test_diagnostics_offer_only_settled_reports() {
+    use std::time::{Duration, SystemTime};
+    let root = fixture("diag");
+    let now = SystemTime::now();
+
+    let old = root.join("fba-fr-1-ded:OLD");
+    fs::create_dir_all(old.join("sysdiagnose_x")).unwrap();
+    let f = fs::File::create(old.join("sysdiagnose_x/log.txt")).unwrap();
+    f.set_modified(now - Duration::from_secs(2 * 86400))
+        .unwrap();
+
+    // Old folder, but a file inside was written a minute ago.
+    let busy = root.join("fba-fr-2-ded:BUSY");
+    fs::create_dir_all(busy.join("sysdiagnose_y")).unwrap();
+    let f = fs::File::create(busy.join("sysdiagnose_y/log.txt")).unwrap();
+    f.set_modified(now - Duration::from_secs(60)).unwrap();
+
+    let offered = superseded::diagnostic_reports(&root, now);
+    assert_eq!(offered, vec![old]);
+    cleanup(&root);
+}

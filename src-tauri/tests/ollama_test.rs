@@ -10,7 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 fn hex(c: char) -> String {
-    std::iter::repeat(c).take(64).collect()
+    c.to_string().repeat(64)
 }
 
 fn fixture(name: &str) -> PathBuf {
