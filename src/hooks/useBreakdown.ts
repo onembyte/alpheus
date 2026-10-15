@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import * as api from "../api";
+import { latestOnly } from "../breakdown/latest";
 import { cardLinks, type Link } from "../breakdown/links";
 import { initial, reduce, screen, shouldRefresh, type Crumb } from "../breakdown/state";
 import type { BreakdownPayload, Card } from "../types";
@@ -28,7 +29,10 @@ export function useBreakdown(cards: Card[] | null) {
       .breakdownCached()
       .then((p) => dispatch({ type: "cached", payload: p }))
       .catch(() => {});
-    const un = listen<BreakdownPayload>("breakdown", (e) => apply(e.payload));
+    // Several payloads a second: draw only the newest, once per frame, so a
+    // busy window never works through a backlog of stale ones.
+    const newest = latestOnly(apply, (flush) => requestAnimationFrame(flush));
+    const un = listen<BreakdownPayload>("breakdown", (e) => newest(e.payload));
     // The app started a walk at launch; this picks it up at once (or starts
     // one if it already finished) instead of waiting for the next event.
     api.breakdownStart().then(apply).catch(() => {});

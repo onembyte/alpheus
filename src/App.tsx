@@ -3,7 +3,6 @@ import { useStorage } from "./hooks/useStorage";
 import { useSettings } from "./hooks/useSettings";
 import { useDrive } from "./hooks/useDrive";
 import { useTheme } from "./hooks/useTheme";
-import { useBreakdown } from "./hooks/useBreakdown";
 import { cardColor, TIER_META, TIER_ORDER } from "./tiers";
 import type { Card, Tier } from "./types";
 import Wallpaper from "./components/Wallpaper";
@@ -15,7 +14,7 @@ import Sheet from "./components/Sheet";
 import HistoryPanel from "./components/HistoryPanel";
 import SettingsPanel from "./components/SettingsPanel";
 import DrivePanel from "./components/DrivePanel";
-import StorageDetail from "./components/StorageDetail";
+import StorageDetailPanel from "./components/StorageDetailPanel";
 import { cardMatches, isEmptyQuery, parseQuery } from "./search";
 import { fmtBytes } from "./format";
 import { fmtKB } from "./format";
@@ -62,7 +61,6 @@ function ScanningState() {
 export default function App() {
   const s = useStorage();
   const d = useDrive();
-  const b = useBreakdown(s.cards);
   const { settings, update: updateSettings } = useSettings();
   const { mode, setMode } = useTheme();
   const [view, setView] = useState<View>("reclaim");
@@ -253,13 +251,9 @@ export default function App() {
                 {/* Live and usable at all times: outside the wrapper a rescan dims,
                     and shown even while the first reclaim scan runs. */}
                 {filter === "all" && !searching && (
-                  <StorageDetail
-                    screen={b.screen}
-                    onOpen={b.open}
-                    onUp={b.up}
-                    links={b.links}
+                  <StorageDetailPanel
+                    cards={s.cards}
                     onReclaim={s.openCard}
-                    onFullDiskAccess={b.openFullDiskAccess}
                     locked={s.cardsFromSnapshot}
                   />
                 )}
