@@ -25,6 +25,9 @@ pub trait Sink: Sync {
     fn child(&self, parent: Self::Node, name: &OsStr) -> Option<Self::Node>;
     /// `bytes` more found directly in `node`, or in folders folded into it.
     fn grow(&self, node: Self::Node, bytes: u64);
+    /// The tracked folder `node` has been measured completely. Not called
+    /// for a folder a cancel cut short.
+    fn done(&self, _node: Self::Node) {}
 }
 
 /// State shared by every walk of one scan.
@@ -112,6 +115,9 @@ fn folder<S: Sink>(
         }
     }
     sink.grow(node, here);
+    if tracked && !shared.cancel.load(Relaxed) {
+        sink.done(node);
+    }
     here + below
 }
 

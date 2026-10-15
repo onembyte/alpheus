@@ -51,7 +51,7 @@ One item per step, test first. Stop and ask at each gate.
 - [x] A1 APFS volume reader: parse `diskutil apfs list -plist` into OS / Data
 - [x] A2 Walker: allocated size, hard-link dedup, no symlinks, one volume,
       unreadable count, cancel flag
-- [ ] A3 Progressive tree: breadth-first scheduler, throttled snapshots;
+- [x] A3 Progressive tree: breadth-first scheduler, throttled snapshots;
       totals only grow; final total matches `du` within 1%
 - [ ] A4 Category map, as in System Settings → Storage (design item 2)
 - [ ] A5 Background QoS, Tauri commands and events (start, cancel, cached),
@@ -61,7 +61,11 @@ One item per step, test first. Stop and ask at each gate.
 ### Phase B: UI
 - [ ] B1 `useBreakdown` hook: events into state, never blocks other views
 - [ ] B2 Storage detail section: category rows, live sizes, measuring state
-- [ ] B3 Drill-down with breadcrumb while the walk continues
+- [ ] B3 Drill-down with breadcrumb while the walk continues. The tree keeps
+      3 levels below each walked folder (keeping every folder would hold
+      hundreds of thousands of rows in memory); drilling past that walks
+      just that folder again, into a staging subtree swapped in when done,
+      so the totals above it never shrink
 - [ ] B4 Links to reclaim cards; Full Disk Access notice
 - [ ] B5 Refresh on focus; top level on the 60 s tick
 - [ ] **Gate B**: run the app, screenshots, timing check

@@ -6,6 +6,7 @@
 
 pub mod analyze;
 pub mod apfs;
+pub mod breakdown;
 pub mod browse;
 pub mod disk;
 pub mod dupes;
@@ -20,6 +21,7 @@ pub mod settings;
 pub mod simulators;
 pub mod snapshot;
 pub mod superseded;
+pub mod tree;
 pub mod walker;
 
 use std::collections::HashMap;
