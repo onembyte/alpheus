@@ -356,3 +356,50 @@ fn test_refreshed_volumes_reach_the_window() {
     assert_eq!(last.root.bytes, (19 + 160) * 1024 * 1024 * 1024);
     let _ = fs::remove_dir_all(d);
 }
+
+/// While the walk runs, what isn't measured yet is reported apart, so the
+/// window never shows it as System Data; at the end it is Unattributed, and
+/// part of System Data like in Settings.
+#[test]
+fn test_unmeasured_space_is_reported_apart_while_running() {
+    use alpheus_lib::apfs::{Container, Volume};
+    let disk = Container {
+        reference: "disk3".into(),
+        capacity_kb: 245 * 1024 * 1024,
+        free_kb: 30 * 1024 * 1024,
+        volumes: [("Macintosh HD", "System", 18u64), ("Data", "Data", 170)]
+            .iter()
+            .map(|(name, role, gb)| Volume {
+                id: name.to_string(),
+                name: name.to_string(),
+                roles: vec![role.to_string()],
+                used_kb: gb * 1024 * 1024,
+            })
+            .collect(),
+    };
+    let d = data_volume("unmeasured");
+    let log: Arc<Mutex<Vec<Payload>>> = Arc::default();
+    let sink = log.clone();
+    let s = Session::start(
+        d.clone(),
+        PathBuf::from("/Users/me"),
+        Some(disk),
+        Duration::from_millis(5),
+        move |p| sink.lock().unwrap().push(p),
+    );
+    s.wait();
+    let log = log.lock().unwrap();
+    let running = log
+        .iter()
+        .rev()
+        .find(|p| p.running)
+        .expect("a payload while running");
+    assert!(
+        running.unmeasured > 0,
+        "the gap is reported while measuring"
+    );
+    let last = log.last().unwrap();
+    assert!(!last.running);
+    assert_eq!(last.unmeasured, 0, "after the walk the gap is Unattributed");
+    let _ = fs::remove_dir_all(d);
+}

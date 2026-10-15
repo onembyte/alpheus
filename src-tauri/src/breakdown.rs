@@ -78,6 +78,11 @@ pub struct Payload {
     pub files: u64,
     pub unreadable: u64,
     pub running: bool,
+    /// While the walk runs: the part of the disk not measured yet, which the
+    /// tree holds in Unattributed. Reported apart so the window doesn't show
+    /// it as System Data. Zero once the walk has ended.
+    #[serde(default)]
+    pub unmeasured: u64,
     /// Unix seconds.
     pub started: u64,
     pub finished: Option<u64>,
@@ -106,7 +111,12 @@ struct Core {
 impl Core {
     fn payload(&self) -> Payload {
         let finished = *self.finished.lock().unwrap();
+        let unmeasured = match (finished, self.tree.remainder_id()) {
+            (None, Some(r)) => self.tree.snapshot(r, 0, 0).bytes,
+            _ => 0,
+        };
         Payload {
+            unmeasured,
             root: self.tree.snapshot(Tree::ROOT, 1, 50),
             focus: self
                 .focus
@@ -155,6 +165,11 @@ impl Session {
             .map_or("Disk".to_string(), |v| v.name.clone());
         let tree = Arc::new(Tree::new(&name));
         let jobs = categories::build(&tree, container.as_ref(), categories::plan(&data, &home));
+        // Until the walk ends, Unattributed is mostly "not measured yet".
+        let remainder = tree.remainder_id();
+        if let Some(r) = remainder {
+            tree.set_state(r, State::Measuring);
+        }
         let core = Arc::new(Core {
             tree,
             shared: Arc::new(Shared::default()),
@@ -177,6 +192,9 @@ impl Session {
                 every,
                 |_| c.emit(),
             );
+            if let Some(r) = remainder {
+                c.tree.set_state(r, State::Done);
+            }
             *c.finished.lock().unwrap() = Some(now());
             c.emit();
         });

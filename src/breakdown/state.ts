@@ -63,7 +63,12 @@ export function reduce(s: State, a: Action): State {
 export interface Row {
   id: number;
   name: string;
+  /** What to show: the last known size until the walk has measured the row. */
   bytes: number;
+  /** What the walk has measured of it so far. */
+  measured: number;
+  /** Showing the last known size while the walk measures the row again. */
+  refreshing: boolean;
   /** What the same row held in the last finished walk. */
   previous: number | null;
   state: NodeState;
@@ -113,19 +118,48 @@ export function screen(s: State): Screen {
     return { ...base, ...empty, title: s.path[s.path.length - 1].name, loading: true };
   }
   const before = preview ? null : previousSizes(s.cached, s.path);
+  const rows: Row[] = parent.children.map((c) => {
+    const previous = before?.get(c.name) ?? null;
+    // The snapshot stands until the walk has measured the row again.
+    const refreshing = c.state !== "done" && previous !== null;
+    return {
+      id: c.id,
+      name: c.name,
+      bytes: refreshing ? previous : c.bytes,
+      measured: c.bytes,
+      refreshing,
+      previous,
+      state: c.state,
+      share: 0,
+      openable: c.openable,
+    };
+  });
+  // Unmeasured space sits in Unattributed, under System Data. With no last
+  // value to stand in for System Data, show that gap as its own row instead.
+  const unmeasured = s.path.length === 0 && s.live?.running ? (s.live.unmeasured ?? 0) : 0;
+  const sys = rows.find((r) => r.name === SYSTEM_DATA);
+  if (unmeasured > 0 && sys && !sys.refreshing) {
+    sys.bytes = Math.max(0, sys.bytes - unmeasured);
+    rows.push({
+      id: NOT_MEASURED_ID,
+      name: "Not measured yet",
+      bytes: unmeasured,
+      measured: 0,
+      refreshing: false,
+      previous: null,
+      state: "measuring",
+      share: 0,
+      openable: false,
+    });
+  }
+  for (const r of rows) r.share = parent.bytes > 0 ? r.bytes / parent.bytes : 0;
+  // Ordered by what is shown, so rows hold still while the walk catches up.
+  rows.sort((a, b) => b.bytes - a.bytes);
   return {
     ...base,
     title: parent.name,
     total: parent.bytes,
-    rows: parent.children.map((c) => ({
-      id: c.id,
-      name: c.name,
-      bytes: c.bytes,
-      previous: before?.get(c.name) ?? null,
-      state: c.state,
-      share: parent.bytes > 0 ? c.bytes / parent.bytes : 0,
-      openable: c.openable,
-    })),
+    rows,
     other: parent.other_count > 0 ? { count: parent.other_count, bytes: parent.other_bytes } : null,
     loading: false,
     // At the top the categories add up to the disk; files only sit in folders.
@@ -133,6 +167,11 @@ export function screen(s: State): Screen {
     measuringHere: s.path.length > 0 && parent.state !== "done",
   };
 }
+
+/** The category the backend keeps Unattributed (and unmeasured space) in. */
+const SYSTEM_DATA = "System Data";
+/** Id of the "Not measured yet" row; real node ids are never negative. */
+export const NOT_MEASURED_ID = -1;
 
 /** Sizes, by name, of the cached rows at the same place in the tree. */
 function previousSizes(cached: BreakdownPayload | null, path: Crumb[]): Map<string, number> | null {

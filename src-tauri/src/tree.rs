@@ -162,6 +162,11 @@ impl Tree {
         }
     }
 
+    /// The node `add_remainder` placed, if any.
+    pub fn remainder_id(&self) -> Option<NodeId> {
+        self.budget.lock().unwrap().map(|(id, _)| id)
+    }
+
     /// Moves the total the tree adds up to (see `add_remainder`).
     pub fn set_budget(&self, bytes: u64) {
         if let Some((_, budget)) = self.budget.lock().unwrap().as_mut() {

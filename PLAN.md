@@ -91,7 +91,7 @@ Alpheus opens on the last known state, however old, and corrects it in the
 background. Proposed; waiting for Franco's go-ahead on the format.
 - [x] S1 One snapshot file with the last reclaim cards and the storage detail
       (3 levels), written after every finished scan and walk; read first at launch
-- [ ] S2 While refreshing, each row keeps its snapshot value until the live walk
+- [x] S2 While refreshing, each row keeps its snapshot value until the live walk
       has measured it, then corrects in place; unmeasured space never shows as
       System Data
 - [ ] S3 Snapshot cards show at once but act only after the fresh scan (the

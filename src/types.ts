@@ -86,6 +86,8 @@ export interface BreakdownPayload {
   files: number;
   unreadable: number;
   running: boolean;
+  /** While running: the part of the disk not measured yet (0 once done). */
+  unmeasured: number;
   /** Unix seconds. */
   started: number;
   finished: number | null;

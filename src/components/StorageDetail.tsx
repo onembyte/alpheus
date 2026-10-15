@@ -72,7 +72,7 @@ export default function StorageDetail({
   const max = Math.max(
     1,
     s.filesHere ?? 0,
-    ...s.rows.map((r) => Math.max(r.bytes, r.previous ?? 0)),
+    ...s.rows.map((r) => Math.max(r.bytes, r.measured)),
   );
 
   return (
@@ -259,35 +259,47 @@ function DetailRow({
           {r.name}
         </div>
         <div className="mono truncate text-[9.5px]" style={{ color: "var(--txt3)" }}>
-          {measuring
-            ? r.previous !== null
-              ? `measuring · ${fmtBytes(r.previous)} last time`
-              : "measuring"
-            : `${(r.share * 100).toFixed(r.share < 0.1 ? 1 : 0)}%`}
+          {r.refreshing
+            ? `updating · ${fmtBytes(r.measured)} so far`
+            : measuring
+              ? "measuring"
+              : `${(r.share * 100).toFixed(r.share < 0.1 ? 1 : 0)}%`}
         </div>
       </div>
       <div
         className="relative h-[9px] min-w-0 flex-1 overflow-hidden rounded-[5px]"
         style={{ background: "var(--track)" }}
       >
-        {measuring && r.previous !== null && (
-          <div
-            className="absolute inset-y-0 left-0 rounded-[5px]"
-            style={{
-              width: `${(r.previous / max) * 100}%`,
-              background: `color-mix(in srgb, ${color} 22%, transparent)`,
-            }}
-          />
-        )}
-        {r.bytes > 0 && (
-          <div
-            className="relative h-full rounded-[5px]"
-            style={{
-              width: `${(r.bytes / max) * 100}%`,
-              background: `linear-gradient(90deg, ${color}, color-mix(in oklch, ${color}, white 22%))`,
-              transition: "width .5s ease",
-            }}
-          />
+        {r.refreshing ? (
+          <>
+            {/* The last known size, and the walk filling it in again. */}
+            <div
+              className="absolute inset-y-0 left-0 rounded-[5px]"
+              style={{
+                width: `${(r.bytes / max) * 100}%`,
+                background: `color-mix(in srgb, ${color} 38%, transparent)`,
+              }}
+            />
+            <div
+              className="relative h-full rounded-[5px]"
+              style={{
+                width: `${(r.measured / max) * 100}%`,
+                background: color,
+                transition: "width .5s ease",
+              }}
+            />
+          </>
+        ) : (
+          r.bytes > 0 && (
+            <div
+              className="relative h-full rounded-[5px]"
+              style={{
+                width: `${(r.bytes / max) * 100}%`,
+                background: `linear-gradient(90deg, ${color}, color-mix(in oklch, ${color}, white 22%))`,
+                transition: "width .5s ease",
+              }}
+            />
+          )
         )}
       </div>
       {link && (

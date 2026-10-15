@@ -31,6 +31,7 @@ function payload(root: BreakdownNode, extra: Partial<BreakdownPayload> = {}): Br
     files: 10,
     unreadable: 0,
     running: true,
+    unmeasured: 0,
     started: 100,
     finished: null,
     ...extra,
@@ -219,5 +220,72 @@ describe("shouldRefresh", () => {
   it("measures again once the last walk is 15 minutes old", () => {
     expect(shouldRefresh(done(1000), 1000 + 14 * 60)).toBe(false);
     expect(shouldRefresh(done(1000), 1000 + 15 * 60)).toBe(true);
+  });
+});
+
+describe("snapshot first", () => {
+  const cached = payload(
+    node("Mac", 300, [node("System Data", 128), node("Developer", 56), node("Documents", 1)]),
+    { running: false, finished: 90 },
+  );
+
+  it("keeps a row's last value until the walk has measured it, then corrects it", () => {
+    const measuring = payload(
+      node("Mac", 300, [
+        node("System Data", 190, [], { state: "measuring" }),
+        node("Developer", 12, [], { state: "measuring" }),
+        node("Documents", 2),
+      ]),
+      { unmeasured: 150 },
+    );
+    const s = screen(run({ type: "cached", payload: cached }, { type: "payload", payload: measuring }));
+    const dev = s.rows.find((r) => r.name === "Developer")!;
+    expect(dev.bytes).toBe(56);
+    expect(dev.refreshing).toBe(true);
+    expect(dev.measured).toBe(12);
+    expect(s.rows.find((r) => r.name === "Documents")!.bytes).toBe(2);
+    expect(s.rows.find((r) => r.name === "System Data")!.bytes).toBe(128);
+    expect(s.rows.some((r) => r.name === "Not measured yet")).toBe(false);
+    expect(s.rows.map((r) => r.name)).toEqual(["System Data", "Developer", "Documents"]);
+
+    const done = payload(
+      node("Mac", 300, [node("System Data", 150), node("Developer", 60), node("Documents", 2)]),
+      { running: false, finished: 200 },
+    );
+    const after = screen(
+      run({ type: "cached", payload: cached }, { type: "payload", payload: measuring }, {
+        type: "payload",
+        payload: done,
+      }),
+    );
+    expect(after.rows.find((r) => r.name === "Developer")!.bytes).toBe(60);
+    expect(after.rows.every((r) => !r.refreshing)).toBe(true);
+  });
+
+  it("on a first launch, shows unmeasured space as its own row, never as System Data", () => {
+    const first = payload(
+      node("Mac", 300, [
+        node("System Data", 193, [], { state: "measuring" }),
+        node("Developer", 20, [], { state: "measuring" }),
+      ]),
+      { unmeasured: 150 },
+    );
+    const s = screen(run({ type: "payload", payload: first }));
+    expect(s.rows.find((r) => r.name === "System Data")!.bytes).toBe(43);
+    const gap = s.rows.find((r) => r.name === "Not measured yet")!;
+    expect(gap.bytes).toBe(150);
+    expect(gap.openable).toBe(false);
+    expect(gap.share).toBeCloseTo(0.5);
+  });
+
+  it("drops the unmeasured row once the walk ends", () => {
+    const ended = payload(node("Mac", 300, [node("System Data", 193)]), {
+      running: false,
+      finished: 100,
+      unmeasured: 0,
+    });
+    expect(screen(run({ type: "payload", payload: ended })).rows.map((r) => r.name)).toEqual([
+      "System Data",
+    ]);
   });
 });
