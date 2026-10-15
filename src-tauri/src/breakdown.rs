@@ -212,6 +212,31 @@ fn now() -> u64 {
         .unwrap_or(0)
 }
 
+/// The app's one walk. The app starts it at launch and the window asks for
+/// it when it opens; both get the same walk, and only a finished one is
+/// replaced. The lock is held while a new walk is planned, so two callers
+/// racing can't start two.
+#[derive(Default)]
+pub struct Slot(Mutex<Option<Arc<Session>>>);
+
+impl Slot {
+    /// The running walk, or a new one from `start`.
+    pub fn ensure(&self, start: impl FnOnce() -> Session) -> Arc<Session> {
+        let mut slot = self.0.lock().unwrap();
+        if let Some(s) = slot.as_ref().filter(|s| s.running()) {
+            return s.clone();
+        }
+        let s = Arc::new(start());
+        *slot = Some(s.clone());
+        s
+    }
+
+    /// The current walk, running or finished.
+    pub fn current(&self) -> Option<Arc<Session>> {
+        self.0.lock().unwrap().clone()
+    }
+}
+
 // ---------------------------------------------------------------- cache
 
 fn cache_file(dir: &Path) -> PathBuf {

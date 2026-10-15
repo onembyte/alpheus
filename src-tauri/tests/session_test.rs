@@ -218,3 +218,38 @@ fn gate_a() {
         p.files, p.unreadable
     );
 }
+
+/// The app starts a walk at launch and the window asks for one when it opens:
+/// both must get the same walk, and only a finished walk is replaced.
+#[test]
+fn test_slot_keeps_one_walk_at_a_time() {
+    use alpheus_lib::breakdown::Slot;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let d = data_volume("slot");
+    let slot = Slot::default();
+    let made = AtomicUsize::new(0);
+    let make = || {
+        made.fetch_add(1, Ordering::SeqCst);
+        start(&d, Arc::default())
+    };
+
+    assert!(slot.current().is_none());
+    let first = slot.ensure(make);
+    let again = slot.ensure(make);
+    assert!(
+        Arc::ptr_eq(&first, &again) || !first.running(),
+        "a running walk is reused"
+    );
+    first.wait();
+    let before = made.load(Ordering::SeqCst);
+    let next = slot.ensure(make);
+    assert_eq!(
+        made.load(Ordering::SeqCst),
+        before + 1,
+        "a finished walk is replaced"
+    );
+    assert!(!Arc::ptr_eq(&first, &next));
+    assert!(Arc::ptr_eq(&slot.current().unwrap(), &next));
+    next.wait();
+    let _ = fs::remove_dir_all(d);
+}

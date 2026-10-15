@@ -24,6 +24,9 @@ export function useBreakdown() {
       .then((p) => dispatch({ type: "cached", payload: p }))
       .catch(() => {});
     const un = listen<BreakdownPayload>("breakdown", (e) => apply(e.payload));
+    // The app started a walk at launch; this picks it up at once (or starts
+    // one if it already finished) instead of waiting for the next event.
+    api.breakdownStart().then(apply).catch(() => {});
     return () => {
       un.then((f) => f());
     };

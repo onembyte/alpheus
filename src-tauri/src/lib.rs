@@ -33,7 +33,7 @@ use tauri::{
     AppHandle, Emitter, Manager, State, WindowEvent,
 };
 
-use breakdown::{Payload, Session};
+use breakdown::{Payload, Session, Slot};
 use disk::DiskUsage;
 use exec::{DryRun, ExecResult};
 use history::HistoryEntry;
@@ -46,10 +46,6 @@ use settings::AppSettings;
 pub struct ScanState(pub Mutex<HashMap<String, Card>>);
 
 pub struct SettingsState(pub Mutex<AppSettings>);
-
-/// The storage detail walk: at most one at a time.
-#[derive(Default)]
-pub struct BreakdownState(pub Mutex<Option<Arc<Session>>>);
 
 #[tauri::command]
 fn disk_usage() -> DiskUsage {
@@ -102,54 +98,57 @@ fn execute(id: String, app: AppHandle, state: State<ScanState>) -> Result<ExecRe
     Ok(result)
 }
 
-/// Starts a storage detail walk of the whole disk, unless one is running.
-/// Payloads arrive as `breakdown` events; the first comes back right away.
-#[tauri::command(async)]
-fn breakdown_start(app: AppHandle, state: State<BreakdownState>) -> Payload {
-    if let Some(s) = state.0.lock().unwrap().as_ref().filter(|s| s.running()) {
-        return s.payload();
-    }
-    let data = std::path::Path::new("/System/Volumes/Data");
-    let data = if data.is_dir() {
-        data
-    } else {
-        std::path::Path::new("/")
-    };
-    let handle = app.clone();
-    let session = Arc::new(Session::start(
-        data.to_path_buf(),
-        scan::home(),
-        apfs::read_root(),
-        std::time::Duration::from_millis(200),
-        move |p: Payload| {
-            let _ = handle.emit("breakdown", &p);
-            // Only a walk that finished is worth showing next launch; a
-            // cancelled one would preview a half-measured disk.
-            if !p.running && p.root.state == tree::State::Done {
-                let current = handle.state::<BreakdownState>().0.lock().unwrap().clone();
-                if let (Some(s), Ok(dir)) = (current, handle.path().app_data_dir()) {
-                    breakdown::save_cache(&dir, &s.cached());
+/// The storage detail walk of the whole disk: the running one, or a new one.
+/// Payloads go out as `breakdown` events; a finished walk is cached for the
+/// next launch's preview.
+fn ensure_breakdown(app: &AppHandle) -> Arc<Session> {
+    app.state::<Slot>().ensure(|| {
+        let data = std::path::Path::new("/System/Volumes/Data");
+        let data = if data.is_dir() {
+            data
+        } else {
+            std::path::Path::new("/")
+        };
+        let handle = app.clone();
+        Session::start(
+            data.to_path_buf(),
+            scan::home(),
+            apfs::read_root(),
+            std::time::Duration::from_millis(200),
+            move |p: Payload| {
+                let _ = handle.emit("breakdown", &p);
+                // Only a walk that finished is worth showing next launch; a
+                // cancelled one would preview a half-measured disk.
+                if !p.running && p.root.state == tree::State::Done {
+                    let current = handle.state::<Slot>().current();
+                    if let (Some(s), Ok(dir)) = (current, handle.path().app_data_dir()) {
+                        breakdown::save_cache(&dir, &s.cached());
+                    }
                 }
-            }
-        },
-    ));
-    let first = session.payload();
-    *state.0.lock().unwrap() = Some(session);
-    first
+            },
+        )
+    })
+}
+
+/// The walk the app started at launch, or a new one if that has finished.
+/// Returns a payload at once; the rest arrive as `breakdown` events.
+#[tauri::command(async)]
+fn breakdown_start(app: AppHandle) -> Payload {
+    ensure_breakdown(&app).payload()
 }
 
 /// Moves the focus (the row whose children travel with each payload) and
 /// returns a payload at once, so opening a row never waits for the next tick.
 #[tauri::command]
-fn breakdown_focus(id: Option<usize>, state: State<BreakdownState>) -> Option<Payload> {
-    let s = state.0.lock().unwrap().clone()?;
+fn breakdown_focus(id: Option<usize>, slot: State<Slot>) -> Option<Payload> {
+    let s = slot.current()?;
     s.set_focus(id);
     Some(s.payload())
 }
 
 #[tauri::command]
-fn breakdown_cancel(state: State<BreakdownState>) {
-    if let Some(s) = state.0.lock().unwrap().as_ref() {
+fn breakdown_cancel(slot: State<Slot>) {
+    if let Some(s) = slot.current() {
         s.cancel();
     }
 }
@@ -269,7 +268,7 @@ pub fn run() {
             None,
         ))
         .manage(ScanState::default())
-        .manage(BreakdownState::default())
+        .manage(Slot::default())
         .manage(google::GoogleState::default())
         .invoke_handler(tauri::generate_handler![
             disk_usage,
@@ -303,6 +302,14 @@ pub fn run() {
                 }
             }
             app.manage(SettingsState(Mutex::new(initial)));
+
+            // Start measuring at launch, before the window has even loaded,
+            // so it opens onto a walk already under way. Low priority: the
+            // reclaim scan keeps its speed (PLAN.md, Gate A).
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                ensure_breakdown(&handle);
+            });
 
             let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?;
             TrayIconBuilder::with_id("main-tray")
