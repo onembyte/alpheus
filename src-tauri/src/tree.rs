@@ -144,6 +144,31 @@ impl Tree {
         id
     }
 
+    /// The child of `parent` called `name`.
+    pub fn find_child(&self, parent: NodeId, name: &str) -> Option<NodeId> {
+        let n = self.nodes.lock().unwrap();
+        n.get(parent)?
+            .children
+            .iter()
+            .copied()
+            .find(|c| n[*c].name == name)
+    }
+
+    /// Replaces the size of a node whose size is known from outside (an APFS
+    /// volume), unlike walked nodes, which only grow.
+    pub fn set_own(&self, id: NodeId, bytes: u64) {
+        if let Some(x) = self.nodes.lock().unwrap().get_mut(id) {
+            x.own = bytes;
+        }
+    }
+
+    /// Moves the total the tree adds up to (see `add_remainder`).
+    pub fn set_budget(&self, bytes: u64) {
+        if let Some((_, budget)) = self.budget.lock().unwrap().as_mut() {
+            *budget = bytes;
+        }
+    }
+
     /// Whether `id` names a node. Ids arrive from the view, so check first.
     pub fn has(&self, id: NodeId) -> bool {
         id < self.nodes.lock().unwrap().len()

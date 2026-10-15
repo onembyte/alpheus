@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import * as api from "../api";
 import { cardLinks, type Link } from "../breakdown/links";
-import { initial, reduce, screen, type Crumb } from "../breakdown/state";
+import { initial, reduce, screen, shouldRefresh, type Crumb } from "../breakdown/state";
 import type { BreakdownPayload, Card } from "../types";
 
 /**
@@ -15,6 +16,8 @@ export function useBreakdown(cards: Card[] | null) {
   const [links, setLinks] = useState<Map<number, Link>>(() => new Map());
   const path = useRef(state.path);
   path.current = state.path;
+  const latest = useRef(state);
+  latest.current = state;
 
   const apply = useCallback((p: BreakdownPayload | null) => {
     if (p) dispatch({ type: "payload", payload: p });
@@ -38,6 +41,17 @@ export function useBreakdown(cards: Card[] | null) {
   const start = useCallback(() => {
     api.breakdownStart().then(apply).catch(() => {});
   }, [apply]);
+
+  // Back to the front after a while: measure again, so the window never
+  // shows an old walk as if it were now. Never over a running walk.
+  useEffect(() => {
+    const un = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (focused && shouldRefresh(latest.current, Date.now() / 1000)) start();
+    });
+    return () => {
+      un.then((f) => f());
+    };
+  }, [start]);
 
   const cancel = useCallback(() => {
     api.breakdownCancel().catch(() => {});

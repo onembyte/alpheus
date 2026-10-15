@@ -367,3 +367,37 @@ fn test_top_level_mounts_are_skipped() {
         "mounted volume became a job"
     );
 }
+
+/// Between walks the APFS figures move (a reclaim, an update download): the
+/// rows that come from APFS, and the total, follow them without a walk.
+#[test]
+fn test_refresh_moves_the_apfs_rows_and_the_total() {
+    let d = data_volume("refresh");
+    let tree = Tree::new("Macintosh HD");
+    let before = container();
+    let jobs = categories::build(
+        &tree,
+        Some(&before),
+        categories::plan(&d, Path::new("/Users/me")),
+    );
+    let shared = Shared::default();
+    for (path, id) in &jobs {
+        walker::walk(path, *id, &tree, &shared);
+    }
+
+    let mut after = container();
+    after.volumes[0].used_kb = 19 * 1024 * 1024; // macOS grew
+    after.volumes[1].used_kb = 8 * 1024 * 1024; // Preboot shrank after an update
+    after.volumes[3].used_kb = 160 * 1024 * 1024; // Data lost 10 GB to a reclaim
+    categories::refresh(&tree, &after);
+
+    let v = tree.snapshot(Tree::ROOT, 2, 50);
+    let used: u64 = after.volumes.iter().map(|v| v.used_kb * 1024).sum();
+    assert_eq!(v.bytes, used);
+    assert_eq!(child(&v, "macOS").bytes, 19 * 1024 * 1024 * 1024);
+    assert_eq!(
+        child(child(&v, "System Data"), "Preboot").bytes,
+        8 * 1024 * 1024 * 1024
+    );
+    let _ = fs::remove_dir_all(d);
+}

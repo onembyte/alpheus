@@ -95,6 +95,15 @@ fn execute(id: String, app: AppHandle, state: State<ScanState>) -> Result<ExecRe
         );
     }
     update_tray(&app);
+    // What was just removed is still in the storage detail's rows: measure
+    // again, unless a walk is already running. Its own thread, so the APFS
+    // read doesn't hold up the confirmation.
+    if result.effective {
+        let handle = app.clone();
+        std::thread::spawn(move || {
+            ensure_breakdown(&handle);
+        });
+    }
     Ok(result)
 }
 
@@ -370,6 +379,18 @@ pub fn run() {
                 loop {
                     std::thread::sleep(std::time::Duration::from_secs(60));
                     update_tray(&handle);
+
+                    // Keep the storage detail's top level true between walks.
+                    // Only while someone can see it: diskutil isn't free.
+                    let visible = handle
+                        .get_webview_window("main")
+                        .and_then(|w| w.is_visible().ok())
+                        .unwrap_or(false);
+                    if let (true, Some(walk)) = (visible, handle.state::<Slot>().current()) {
+                        if let Some(container) = apfs::read_root() {
+                            walk.refresh_volumes(&container);
+                        }
+                    }
 
                     let (interval_secs, threshold_gb, auto_clean, auto_ids, last_scan_ts) = {
                         let s = handle.state::<SettingsState>();

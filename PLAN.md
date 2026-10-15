@@ -72,7 +72,8 @@ One item per step, test first. Stop and ask at each gate.
       just that folder again, into a staging subtree swapped in when done,
       so the totals above it never shrink
 - [x] B4 Links to reclaim cards; Full Disk Access notice
-- [ ] B5 Refresh on focus; top level on the 60 s tick. Done early, at Franco's
+- [x] B5 Refresh on focus; top level on the 60 s tick (only while the window is
+      visible); a fresh walk after a reclaim that freed space. Done early, at Franco's
       request (2026-10-15): the walk starts at app launch from the backend,
       before the window loads, and the window picks it up when it opens
 - [ ] **Gate B**: run the app, screenshots, timing check

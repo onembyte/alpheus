@@ -140,3 +140,17 @@ function previousSizes(cached: BreakdownPayload | null, path: Crumb[]): Map<stri
   for (const crumb of path) node = node?.children.find((c) => c.name === crumb.name);
   return node ? new Map(node.children.map((c) => [c.name, c.bytes])) : null;
 }
+
+/** How old a finished walk may get before the window measures again. */
+export const STALE_AFTER_SECS = 15 * 60;
+
+/**
+ * Whether bringing the window to the front should start a walk: when none
+ * has reported yet, or the last one finished long enough ago. Never over a
+ * running one.
+ */
+export function shouldRefresh(s: State, nowSecs: number): boolean {
+  if (!s.live) return true;
+  if (s.live.running) return false;
+  return nowSecs - (s.live.finished ?? 0) >= STALE_AFTER_SECS;
+}

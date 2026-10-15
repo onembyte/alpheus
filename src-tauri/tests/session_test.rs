@@ -322,3 +322,45 @@ fn test_locate_maps_user_paths_onto_the_data_volume() {
     assert!(chains[2].is_empty());
     let _ = fs::remove_dir_all(d);
 }
+
+/// The 60-second tick re-reads APFS; the session applies it and tells the
+/// window, even after the walk has ended.
+#[test]
+fn test_refreshed_volumes_reach_the_window() {
+    use alpheus_lib::apfs::{Container, Volume};
+    let disk = |macos_gb: u64, data_gb: u64| Container {
+        reference: "disk3".into(),
+        capacity_kb: 245 * 1024 * 1024,
+        free_kb: 30 * 1024 * 1024,
+        volumes: [
+            ("Macintosh HD", "System", macos_gb),
+            ("Data", "Data", data_gb),
+        ]
+        .iter()
+        .map(|(name, role, gb)| Volume {
+            id: name.to_string(),
+            name: name.to_string(),
+            roles: vec![role.to_string()],
+            used_kb: gb * 1024 * 1024,
+        })
+        .collect(),
+    };
+    let d = data_volume("refresh");
+    let log: Arc<Mutex<Vec<Payload>>> = Arc::default();
+    let sink = log.clone();
+    let s = Session::start(
+        d.clone(),
+        PathBuf::from("/Users/me"),
+        Some(disk(18, 170)),
+        Duration::from_millis(5),
+        move |p| sink.lock().unwrap().push(p),
+    );
+    s.wait();
+    let sent = log.lock().unwrap().len();
+
+    s.refresh_volumes(&disk(19, 160));
+    let last = log.lock().unwrap().last().cloned().unwrap();
+    assert!(log.lock().unwrap().len() > sent, "the window was told");
+    assert_eq!(last.root.bytes, (19 + 160) * 1024 * 1024 * 1024);
+    let _ = fs::remove_dir_all(d);
+}

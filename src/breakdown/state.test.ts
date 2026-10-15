@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { initial, reduce, screen, type Action, type State } from "./state";
+import { initial, reduce, screen, shouldRefresh, type Action, type State } from "./state";
 import type { BreakdownNode, BreakdownPayload } from "../types";
 
 let nextId = 1;
@@ -199,5 +199,25 @@ describe("opening rows", () => {
     const s = screen(run({ type: "payload", payload: payload(node("Mac", 10, [node("A", 10)])) }));
     expect(s.filesHere).toBeNull();
     expect(s.measuringHere).toBe(false);
+  });
+});
+
+describe("shouldRefresh", () => {
+  const done = (finished: number) =>
+    run({ type: "payload", payload: payload(node("Mac", 1), { running: false, finished }) });
+
+  it("measures when nothing live has been seen yet", () => {
+    expect(shouldRefresh(initial, 1000)).toBe(true);
+  });
+
+  it("never starts a second walk over a running one", () => {
+    expect(shouldRefresh(run({ type: "payload", payload: payload(node("Mac", 1)) }), 99999)).toBe(
+      false,
+    );
+  });
+
+  it("measures again once the last walk is 15 minutes old", () => {
+    expect(shouldRefresh(done(1000), 1000 + 14 * 60)).toBe(false);
+    expect(shouldRefresh(done(1000), 1000 + 15 * 60)).toBe(true);
   });
 });

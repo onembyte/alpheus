@@ -257,6 +257,13 @@ impl Session {
         self.core.payload()
     }
 
+    /// Applies fresh APFS figures to the rows that come from APFS and to the
+    /// total, then tells the window. Cheap: nothing is walked.
+    pub fn refresh_volumes(&self, container: &Container) {
+        categories::refresh(&self.core.tree, container);
+        self.core.emit();
+    }
+
     /// For each path, the rows holding it from the root down (empty when the
     /// walk doesn't cover it). Paths may be written as the user sees them
     /// (`/Users/…`) or on the Data volume itself.

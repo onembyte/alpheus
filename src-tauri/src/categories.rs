@@ -229,14 +229,10 @@ pub fn build(tree: &Tree, container: Option<&Container>, jobs: Vec<Job>) -> Vec<
 
     if let Some(k) = container {
         let sys = nodes[&Category::SystemData];
-        for v in &k.volumes {
-            let walked_or_macos = v.roles.iter().any(|r| r == "System" || r == "Data");
-            if !walked_or_macos {
-                tree.add_measured(sys, &v.name, v.used_kb * 1024);
-            }
+        for v in support_volumes(k) {
+            tree.add_measured(sys, &v.name, v.used_kb * 1024);
         }
-        let used: u64 = k.volumes.iter().map(|v| v.used_kb * 1024).sum();
-        tree.add_remainder(sys, "Unattributed", used);
+        tree.add_remainder(sys, UNATTRIBUTED, used_bytes(k));
     }
 
     let mut groups: HashMap<(Category, &str), NodeId> = HashMap::new();
@@ -252,4 +248,39 @@ pub fn build(tree: &Tree, container: Option<&Container>, jobs: Vec<Job>) -> Vec<
             (j.path, id)
         })
         .collect()
+}
+
+/// Brings the rows that come from APFS, and the total the tree adds up to,
+/// to `container`'s current figures. No walking: between walks this keeps
+/// the top level true while the rows measured by the walk wait for the next.
+pub fn refresh(tree: &Tree, container: &Container) {
+    if let (Some(system), Some(id)) = (
+        container.role("System"),
+        tree.find_child(Tree::ROOT, Category::MacOS.label()),
+    ) {
+        tree.set_own(id, system.used_kb * 1024);
+    }
+    if let Some(sys) = tree.find_child(Tree::ROOT, Category::SystemData.label()) {
+        for v in support_volumes(container) {
+            if let Some(id) = tree.find_child(sys, &v.name) {
+                tree.set_own(id, v.used_kb * 1024);
+            }
+        }
+    }
+    tree.set_budget(used_bytes(container));
+}
+
+const UNATTRIBUTED: &str = "Unattributed";
+
+/// Volumes shown as rows under System Data: everything but macOS itself and
+/// the Data volume, whose contents are walked.
+fn support_volumes(k: &Container) -> impl Iterator<Item = &crate::apfs::Volume> {
+    k.volumes
+        .iter()
+        .filter(|v| !v.roles.iter().any(|r| r == "System" || r == "Data"))
+}
+
+/// What the whole container holds: the total the tree must add up to.
+fn used_bytes(k: &Container) -> u64 {
+    k.volumes.iter().map(|v| v.used_kb * 1024).sum()
 }
