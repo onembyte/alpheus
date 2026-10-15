@@ -107,4 +107,4 @@ background. Proposed; waiting for Franco's go-ahead on the format.
       bring it to the front before judging it.
 
 ### Phase C: release (only when asked)
-- [ ] Version bump to **0.9.1** (Franco, 2026-10-15), universal DMG, release
+- [x] Version bump to **0.9.1** (Franco, 2026-10-15), universal DMG, release
