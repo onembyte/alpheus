@@ -2,7 +2,7 @@
 //! with live payloads for the view, a focus the user can move while it runs,
 //! cancel, and a cached copy of the last finished result for instant preview.
 
-use alpheus_lib::breakdown::{self, Payload, Session};
+use alpheus_lib::breakdown::{Payload, Session};
 use alpheus_lib::scan;
 use alpheus_lib::tree::State;
 use std::fs;
@@ -113,29 +113,21 @@ fn test_cancel_ends_the_session() {
     let _ = fs::remove_dir_all(d);
 }
 
-/// The finished result is saved, so the next launch can show it at once.
-/// A damaged cache is ignored, never shown.
+/// What a session hands over for the next launch (saved by `last_state`):
+/// the totals as they are, with rows below the categories kept.
 #[test]
-fn test_cache_round_trip_and_damaged_cache() {
+fn test_cached_result_keeps_the_rows_below_categories() {
     let d = data_volume("cache");
-    let dir = fixture("cache_dir");
-    let log: Arc<Mutex<Vec<Payload>>> = Arc::default();
-    let s = start(&d, log.clone());
+    let s = start(&d, Arc::default());
     s.wait();
-
-    breakdown::save_cache(&dir, &s.cached());
-    let back = breakdown::load_cache(&dir).expect("cache reads back");
-    assert_eq!(back.root.bytes, s.payload().root.bytes);
+    let kept = s.cached();
+    assert_eq!(kept.root.bytes, s.payload().root.bytes);
+    assert!(kept.focus.is_none());
     assert!(
-        back.root.children.iter().any(|c| !c.children.is_empty()),
-        "the cached copy keeps a second level for the preview"
+        kept.root.children.iter().any(|c| !c.children.is_empty()),
+        "rows below the categories are kept"
     );
-
-    fs::write(dir.join("breakdown.json"), "{ broken").unwrap();
-    assert!(breakdown::load_cache(&dir).is_none());
-    assert!(breakdown::load_cache(&dir.join("missing")).is_none());
     let _ = fs::remove_dir_all(d);
-    let _ = fs::remove_dir_all(dir);
 }
 
 /// The walk must yield to the app: its threads run below default priority.

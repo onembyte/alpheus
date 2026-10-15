@@ -6,14 +6,14 @@
 //! Scanners run in parallel threads; sizes are `du -sk` actuals, not estimates.
 //! Nothing in this module deletes anything — see `exec` for that.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;
 
-#[derive(Serialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum Tier {
     Safe,
@@ -21,7 +21,7 @@ pub enum Tier {
     Manual,
 }
 
-#[derive(Serialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum ActionKind {
     Delete,
@@ -29,7 +29,7 @@ pub enum ActionKind {
     Explain,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Card {
     pub id: String,
     pub title: String,

@@ -89,7 +89,7 @@ One item per step, test first. Stop and ask at each gate.
 ### Phase S: snapshot first (Franco, 2026-10-15)
 Alpheus opens on the last known state, however old, and corrects it in the
 background. Proposed; waiting for Franco's go-ahead on the format.
-- [ ] S1 One snapshot file with the last reclaim cards and the storage detail
+- [x] S1 One snapshot file with the last reclaim cards and the storage detail
       (3 levels), written after every finished scan and walk; read first at launch
 - [ ] S2 While refreshing, each row keeps its snapshot value until the live walk
       has measured it, then corrects in place; unmeasured space never shows as

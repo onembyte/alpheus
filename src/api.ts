@@ -29,3 +29,5 @@ export const breakdownCached = () => invoke<BreakdownPayload | null>("breakdown_
 export const breakdownLocate = (paths: string[]) =>
   invoke<number[][]>("breakdown_locate", { paths });
 export const openFullDiskAccess = () => invoke<void>("open_full_disk_access");
+/** The last finished scan's cards and when it ran, for the instant launch. */
+export const cardsCached = () => invoke<[Card[], number] | null>("cards_cached");

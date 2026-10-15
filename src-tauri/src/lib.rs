@@ -14,6 +14,7 @@ pub mod dupes;
 pub mod exec;
 pub mod google;
 pub mod history;
+pub mod last_state;
 pub mod ollama;
 pub mod qos;
 pub mod rules;
@@ -53,10 +54,21 @@ fn disk_usage() -> DiskUsage {
 }
 
 #[tauri::command(async)]
-fn scan(state: State<ScanState>) -> Vec<Card> {
+fn scan(app: AppHandle, state: State<ScanState>) -> Vec<Card> {
     let cards = scan::scan_all();
     *state.0.lock().unwrap() = cards.iter().map(|c| (c.id.clone(), c.clone())).collect();
+    if let Ok(dir) = app.path().app_data_dir() {
+        last_state::save_cards(&dir, &cards, now_secs());
+    }
     cards
+}
+
+/// The cards of the last finished scan and when it ran, shown at launch
+/// before the new scan lands. Display only: actions need ids from a live scan.
+#[tauri::command]
+fn cards_cached(app: AppHandle) -> Option<(Vec<Card>, u64)> {
+    let s = last_state::load(&app.path().app_data_dir().ok()?);
+    Some((s.cards?, s.cards_at?))
 }
 
 #[tauri::command(async)]
@@ -131,7 +143,7 @@ fn ensure_breakdown(app: &AppHandle) -> Arc<Session> {
                 if !p.running && p.root.state == tree::State::Done {
                     let current = handle.state::<Slot>().current();
                     if let (Some(s), Ok(dir)) = (current, handle.path().app_data_dir()) {
-                        breakdown::save_cache(&dir, &s.cached());
+                        last_state::save_breakdown(&dir, &s.cached());
                     }
                 }
             },
@@ -192,7 +204,7 @@ fn breakdown_cancel(slot: State<Slot>) {
 /// The last finished walk, shown while a new one runs.
 #[tauri::command]
 fn breakdown_cached(app: AppHandle) -> Option<Payload> {
-    breakdown::load_cache(&app.path().app_data_dir().ok()?)
+    last_state::load(&app.path().app_data_dir().ok()?).breakdown
 }
 
 #[tauri::command]
@@ -323,7 +335,8 @@ pub fn run() {
             breakdown_cancel,
             breakdown_locate,
             open_full_disk_access,
-            breakdown_cached
+            breakdown_cached,
+            cards_cached
         ])
         .setup(|app| {
             let initial = app
@@ -482,6 +495,9 @@ pub fn run() {
                         let state = handle.state::<ScanState>();
                         *state.0.lock().unwrap() =
                             cards.iter().map(|c| (c.id.clone(), c.clone())).collect();
+                        if let Ok(dir) = handle.path().app_data_dir() {
+                            last_state::save_cards(&dir, &cards, now_secs());
+                        }
                         let _ = handle.emit("auto-scan", &cards);
                         update_tray(&handle);
                     }

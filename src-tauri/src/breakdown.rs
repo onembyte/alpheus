@@ -8,7 +8,7 @@
 //!
 //! A [`Session`] is one such walk of the whole disk, as the app runs it: it
 //! sends small payloads while running, lets the user move the focus, can be
-//! cancelled, and leaves a result worth caching for the next launch.
+//! cancelled, and leaves a result worth keeping for the next launch.
 
 use crate::apfs::Container;
 use crate::categories;
@@ -17,8 +17,7 @@ use crate::tree::{NodeId, State, Tree, View};
 use crate::walker::{self, Shared};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -282,11 +281,12 @@ impl Session {
             .collect()
     }
 
-    /// The result as cached for the next launch: two levels, so the preview
-    /// can open a category before the new walk reaches it.
+    /// The result as kept for the next launch (see `last_state`): three
+    /// levels, so the snapshot can stand in for most of the view until the
+    /// new walk reaches each row. 30 rows a level keeps the file small.
     pub fn cached(&self) -> Payload {
         let mut p = self.payload();
-        p.root = self.core.tree.snapshot(Tree::ROOT, 2, 50);
+        p.root = self.core.tree.snapshot(Tree::ROOT, 3, 30);
         p.focus = None;
         p
     }
@@ -322,23 +322,4 @@ impl Slot {
     pub fn current(&self) -> Option<Arc<Session>> {
         self.0.lock().unwrap().clone()
     }
-}
-
-// ---------------------------------------------------------------- cache
-
-fn cache_file(dir: &Path) -> PathBuf {
-    dir.join("breakdown.json")
-}
-
-pub fn save_cache(dir: &Path, p: &Payload) {
-    if fs::create_dir_all(dir).is_ok() {
-        if let Ok(json) = serde_json::to_string(p) {
-            let _ = fs::write(cache_file(dir), json);
-        }
-    }
-}
-
-/// The last finished result, or `None` when there is none or it is damaged.
-pub fn load_cache(dir: &Path) -> Option<Payload> {
-    serde_json::from_str(&fs::read_to_string(cache_file(dir)).ok()?).ok()
 }

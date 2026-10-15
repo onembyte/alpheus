@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import * as api from "../api";
+import { shownCards, type CardSnapshot } from "../storage/snapshot";
 import type { Card, DiskUsage, DryRun, HistoryEntry, Tier } from "../types";
 
 export interface ModalState {
@@ -16,6 +17,8 @@ export interface ModalState {
 export function useStorage() {
   const [usage, setUsage] = useState<DiskUsage | null>(null);
   const [cards, setCards] = useState<Card[] | null>(null);
+  // The last scan's cards, kept on disk: shown at once, until the new scan lands.
+  const [snapshot, setSnapshot] = useState<CardSnapshot | null>(null);
   const [scanning, setScanning] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [modal, setModal] = useState<ModalState | null>(null);
@@ -46,10 +49,16 @@ export function useStorage() {
   }, [refreshUsage]);
 
   useEffect(() => {
+    api
+      .cardsCached()
+      .then((kept) => kept && setSnapshot({ cards: kept[0], at: kept[1] }))
+      .catch(() => {});
     refreshUsage();
     rescan();
     refreshHistory();
   }, [refreshUsage, rescan, refreshHistory]);
+
+  const shown = useMemo(() => shownCards(cards, snapshot), [cards, snapshot]);
 
   const showToast = useCallback((msg: string) => {
     window.clearTimeout(toastTimer.current);
@@ -113,15 +122,18 @@ export function useStorage() {
 
   const totals = useMemo(() => {
     const sum = (tier: Tier) =>
-      cards
+      shown.cards
         ?.filter((c) => c.tier === tier && c.action !== "explain")
         .reduce((s, c) => s + c.size_kb, 0) ?? 0;
     return { safe: sum("safe"), care: sum("with-care") };
-  }, [cards]);
+  }, [shown]);
 
   return {
     usage,
-    cards,
+    cards: shown.cards,
+    /** The cards come from the last scan, kept on disk; the new one is running. */
+    cardsFromSnapshot: shown.fromSnapshot,
+    cardsAt: shown.at,
     scanning,
     history,
     modal,

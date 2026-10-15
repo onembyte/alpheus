@@ -44,5 +44,5 @@ jobs:
         working-directory: src-tauri
 
       - name: Rust — Test Suite
-        run: cargo test --test safety_and_scanners_test --test superseded_test --test ollama_test --test apfs_test --test walker_test --test tree_test --test categories_test --test session_test
+        run: cargo test --test safety_and_scanners_test --test superseded_test --test ollama_test --test apfs_test --test walker_test --test tree_test --test categories_test --test session_test --test last_state_test
         working-directory: src-tauri
