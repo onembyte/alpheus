@@ -76,7 +76,27 @@ One item per step, test first. Stop and ask at each gate.
       visible); a fresh walk after a reclaim that freed space. Done early, at Franco's
       request (2026-10-15): the walk starts at app launch from the backend,
       before the window loads, and the window picks it up when it opens
-- [ ] **Gate B**: run the app, screenshots, timing check
+- [x] **Gate B** (2026-10-15): release build, two launches, screenshots.
+      Window in 1.0-1.6 s; storage detail shows under the reclaim scan's spinner;
+      finished view with reclaimable links on System Data (15 GB) and Developer
+      (14 GB); 80-100 MB of memory. Whole-disk walk took 291 s and 331 s, but the
+      load average was ~170 (seven rustc builds from another session); App Nap
+      was ruled out (no change with it off). Under Gate A's normal load: 41 s.
+      Found: while measuring, rows restart near zero and System Data carries all
+      unmeasured space (193 GB): fixed by the snapshot-first items below.
+      Not exercised by hand: clicking into rows (no UI automation here).
+
+### Phase S: snapshot first (Franco, 2026-10-15)
+Alpheus opens on the last known state, however old, and corrects it in the
+background. Proposed; waiting for Franco's go-ahead on the format.
+- [ ] S1 One snapshot file with the last reclaim cards and the storage detail
+      (3 levels), written after every finished scan and walk; read first at launch
+- [ ] S2 While refreshing, each row keeps its snapshot value until the live walk
+      has measured it, then corrects in place; unmeasured space never shows as
+      System Data
+- [ ] S3 Snapshot cards show at once but act only after the fresh scan (the
+      backend already refuses ids the last live scan didn't produce)
+- [ ] **Gate S**: launch after a reboot-like cold start, screenshots
 
 ### Phase C: release (only when asked)
-- [ ] Version bump, universal DMG, release
+- [ ] Version bump to **0.9.1** (Franco, 2026-10-15), universal DMG, release
