@@ -3,6 +3,7 @@ import { useStorage } from "./hooks/useStorage";
 import { useSettings } from "./hooks/useSettings";
 import { useDrive } from "./hooks/useDrive";
 import { useTheme } from "./hooks/useTheme";
+import { useBreakdown } from "./hooks/useBreakdown";
 import { cardColor, TIER_META, TIER_ORDER } from "./tiers";
 import type { Card, Tier } from "./types";
 import Wallpaper from "./components/Wallpaper";
@@ -14,6 +15,7 @@ import Sheet from "./components/Sheet";
 import HistoryPanel from "./components/HistoryPanel";
 import SettingsPanel from "./components/SettingsPanel";
 import DrivePanel from "./components/DrivePanel";
+import StorageDetail from "./components/StorageDetail";
 import { cardMatches, isEmptyQuery, parseQuery } from "./search";
 import { fmtBytes } from "./format";
 import { fmtKB } from "./format";
@@ -59,6 +61,7 @@ function ScanningState() {
 export default function App() {
   const s = useStorage();
   const d = useDrive();
+  const b = useBreakdown();
   const { settings, update: updateSettings } = useSettings();
   const { mode, setMode } = useTheme();
   const [view, setView] = useState<View>("reclaim");
@@ -198,93 +201,103 @@ export default function App() {
               <DrivePanel d={d} onOpenSettings={() => setView("settings")} />
             ) : view === "history" ? (
               <HistoryPanel entries={s.history} />
-            ) : s.scanning && !s.cards ? (
-              <ScanningState />
-            ) : s.cards && s.cards.length === 0 ? (
-              <div className="glass-card fade-up px-[18px] py-14 text-center">
-                <div className="text-[13px]" style={{ color: "var(--txt2)" }}>
-                  Nothing left to reclaim — the disk is clean.
-                </div>
-                <div className="mono mt-1 text-[10.5px]" style={{ color: "var(--txt3)" }}>
-                  rescan anytime · caches grow back on their own
-                </div>
-              </div>
             ) : (
-              <div
-                className={`flex flex-col gap-4 ${s.scanning ? "pointer-events-none opacity-60" : ""}`}
-              >
-                {s.usage && s.cards && filter === "all" && !searching && (
-                  <OverviewPanel
-                    usage={s.usage}
-                    cards={s.cards}
-                    warnBelowGb={settings?.notify_below_gb ?? 15}
-                    onFreeUp={() => setFilter("safe")}
-                  />
-                )}
-
-                {(s.cards ?? []).filter(
-                  (c) =>
-                    (filter === "all" || c.tier === filter) && cardMatches(c, parsedQuery),
-                ).length === 0 && (
-                  <div className="glass-card fade-up px-[18px] py-12 text-center">
+              <div className="flex flex-col gap-4">
+                {s.scanning && !s.cards ? (
+                  <ScanningState />
+                ) : s.cards && s.cards.length === 0 ? (
+                  <div className="glass-card fade-up px-[18px] py-14 text-center">
                     <div className="text-[13px]" style={{ color: "var(--txt2)" }}>
-                      {searching ? "Nothing matches that filter." : "Nothing in this tier right now."}
+                      Nothing left to reclaim — the disk is clean.
                     </div>
                     <div className="mono mt-1 text-[10.5px]" style={{ color: "var(--txt3)" }}>
-                      {searching
-                        ? "try size:>500MB, tier:safe, or plain text — Esc clears"
-                        : "rescan or pick another category on the left"}
+                      rescan anytime · caches grow back on their own
                     </div>
                   </div>
-                )}
+                ) : s.usage && s.cards && filter === "all" && !searching ? (
+                  <div className={s.scanning ? "pointer-events-none opacity-60" : ""}>
+                    <OverviewPanel
+                      usage={s.usage}
+                      cards={s.cards}
+                      warnBelowGb={settings?.notify_below_gb ?? 15}
+                      onFreeUp={() => setFilter("safe")}
+                    />
+                  </div>
+                ) : null}
 
-                {visibleTiers.map((tier) => {
-                  const meta = TIER_META[tier];
-                  const group = (s.cards ?? []).filter(
-                    (c) => c.tier === tier && cardMatches(c, parsedQuery),
-                  );
-                  if (group.length === 0) return null;
-                  const groupTotal = group
-                    .filter((c) => c.action !== "explain")
-                    .reduce((sum, c) => sum + c.size_kb, 0);
-                  return (
-                    <section key={tier} className="glass-card fade-up px-[18px] pb-1 pt-4">
-                      <div className="mb-1.5 flex items-baseline gap-2.5">
-                        <span
-                          className="h-2 w-2 flex-none self-center rounded-[3px]"
-                          style={{ background: meta.color }}
-                        />
-                        <h2 className="section-label">{meta.heading}</h2>
-                        {groupTotal > 0 && (
-                          <span className="mono text-[10.5px]" style={{ color: "var(--txt2)" }}>
-                            {fmtKB(groupTotal)}
-                          </span>
-                        )}
-                        <span
-                          className="hidden min-w-0 truncate text-[11px] md:block"
-                          style={{ color: "var(--txt3)" }}
-                        >
-                          {meta.sub}
-                        </span>
+                {/* Live and usable at all times: outside the wrapper a rescan dims,
+                    and shown even while the first reclaim scan runs. */}
+                {filter === "all" && !searching && <StorageDetail screen={b.screen} />}
+
+                {s.cards && s.cards.length > 0 && (
+                  <div
+                    className={`flex flex-col gap-4 ${s.scanning ? "pointer-events-none opacity-60" : ""}`}
+                  >
+                    {(s.cards ?? []).filter(
+                      (c) =>
+                        (filter === "all" || c.tier === filter) && cardMatches(c, parsedQuery),
+                    ).length === 0 && (
+                      <div className="glass-card fade-up px-[18px] py-12 text-center">
+                        <div className="text-[13px]" style={{ color: "var(--txt2)" }}>
+                          {searching ? "Nothing matches that filter." : "Nothing in this tier right now."}
+                        </div>
+                        <div className="mono mt-1 text-[10.5px]" style={{ color: "var(--txt3)" }}>
+                          {searching
+                            ? "try size:>500MB, tier:safe, or plain text — Esc clears"
+                            : "rescan or pick another category on the left"}
+                        </div>
                       </div>
-                      {group.map((card) => (
-                        <CardRow
-                          key={card.id}
-                          card={card}
-                          color={colorOf(card)}
-                          maxKb={maxKb}
-                          onAction={s.openCard}
-                          autoOn={
-                            card.tier === "safe" && card.action === "delete" && settings
-                              ? settings.auto_clean_ids.includes(card.id)
-                              : null
-                          }
-                          onToggleAuto={toggleAuto}
-                        />
-                      ))}
-                    </section>
-                  );
-                })}
+                    )}
+
+                    {visibleTiers.map((tier) => {
+                      const meta = TIER_META[tier];
+                      const group = (s.cards ?? []).filter(
+                        (c) => c.tier === tier && cardMatches(c, parsedQuery),
+                      );
+                      if (group.length === 0) return null;
+                      const groupTotal = group
+                        .filter((c) => c.action !== "explain")
+                        .reduce((sum, c) => sum + c.size_kb, 0);
+                      return (
+                        <section key={tier} className="glass-card fade-up px-[18px] pb-1 pt-4">
+                          <div className="mb-1.5 flex items-baseline gap-2.5">
+                            <span
+                              className="h-2 w-2 flex-none self-center rounded-[3px]"
+                              style={{ background: meta.color }}
+                            />
+                            <h2 className="section-label">{meta.heading}</h2>
+                            {groupTotal > 0 && (
+                              <span className="mono text-[10.5px]" style={{ color: "var(--txt2)" }}>
+                                {fmtKB(groupTotal)}
+                              </span>
+                            )}
+                            <span
+                              className="hidden min-w-0 truncate text-[11px] md:block"
+                              style={{ color: "var(--txt3)" }}
+                            >
+                              {meta.sub}
+                            </span>
+                          </div>
+                          {group.map((card) => (
+                            <CardRow
+                              key={card.id}
+                              card={card}
+                              color={colorOf(card)}
+                              maxKb={maxKb}
+                              onAction={s.openCard}
+                              autoOn={
+                                card.tier === "safe" && card.action === "delete" && settings
+                                  ? settings.auto_clean_ids.includes(card.id)
+                                  : null
+                              }
+                              onToggleAuto={toggleAuto}
+                            />
+                          ))}
+                        </section>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </main>
