@@ -16,6 +16,8 @@ interface Props {
   /** Opens a card's review sheet: the only way anything here gets removed. */
   onReclaim: (card: Card) => void;
   onFullDiskAccess: () => void;
+  /** Cards come from the kept snapshot: reclaim links wait for the new scan. */
+  locked: boolean;
 }
 
 function Spinner() {
@@ -64,6 +66,7 @@ export default function StorageDetail({
   links,
   onReclaim,
   onFullDiskAccess,
+  locked,
 }: Props) {
   const notice = accessNotice(s.unreadable);
   const top = s.crumbs.length === 0;
@@ -169,6 +172,7 @@ export default function StorageDetail({
             link={links.get(r.id)}
             onOpen={onOpen}
             onReclaim={onReclaim}
+            locked={locked}
           />
         ))}
         {s.filesHere !== null && (
@@ -241,6 +245,7 @@ function DetailRow({
   link,
   onOpen,
   onReclaim,
+  locked,
 }: {
   row: Row;
   max: number;
@@ -248,6 +253,7 @@ function DetailRow({
   link: Link | undefined;
   onOpen: (crumb: Crumb) => void;
   onReclaim: (card: Card) => void;
+  locked: boolean;
 }) {
   const open = () => onOpen({ id: r.id, name: r.name });
   const measuring = r.state !== "done";
@@ -308,10 +314,16 @@ function DetailRow({
             e.stopPropagation();
             onReclaim(link.cards[0]);
           }}
-          title={link.cards.map((c) => `${c.title} — ${fmtKB(c.size_kb)}`).join("\n")}
+          disabled={locked}
+          title={
+            locked
+              ? "Unlocks when the new scan finishes"
+              : link.cards.map((c) => `${c.title} — ${fmtKB(c.size_kb)}`).join("\n")
+          }
           className="btn-focus h-6 flex-none rounded-md px-2 text-[10.5px] font-semibold"
           style={{
             color: "var(--good)",
+            opacity: locked ? 0.5 : 1,
             background: "color-mix(in srgb, var(--good) 12%, transparent)",
             boxShadow: "0 0 0 1px color-mix(in srgb, var(--good) 26%, transparent)",
           }}

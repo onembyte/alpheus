@@ -46,6 +46,19 @@ use settings::AppSettings;
 #[derive(Default)]
 pub struct ScanState(pub Mutex<HashMap<String, Card>>);
 
+impl ScanState {
+    /// The card `id` from the last live scan. Cards shown from the kept
+    /// snapshot (`last_state`) are never in here, so they can't be acted on.
+    pub fn live(&self, id: &str) -> Result<Card, String> {
+        self.0
+            .lock()
+            .unwrap()
+            .get(id)
+            .cloned()
+            .ok_or_else(|| "unknown card — rescan first".to_string())
+    }
+}
+
 pub struct SettingsState(pub Mutex<AppSettings>);
 
 #[tauri::command]
@@ -73,25 +86,13 @@ fn cards_cached(app: AppHandle) -> Option<(Vec<Card>, u64)> {
 
 #[tauri::command(async)]
 fn dry_run(id: String, state: State<ScanState>) -> Result<DryRun, String> {
-    let card = state
-        .0
-        .lock()
-        .unwrap()
-        .get(&id)
-        .cloned()
-        .ok_or_else(|| "unknown card — rescan first".to_string())?;
+    let card = state.live(&id)?;
     exec::dry_run(&card)
 }
 
 #[tauri::command(async)]
 fn execute(id: String, app: AppHandle, state: State<ScanState>) -> Result<ExecResult, String> {
-    let card = state
-        .0
-        .lock()
-        .unwrap()
-        .get(&id)
-        .cloned()
-        .ok_or_else(|| "unknown card — rescan first".to_string())?;
+    let card = state.live(&id)?;
     let result = exec::execute(&card)?;
     if let Ok(dir) = app.path().app_data_dir() {
         history::append(

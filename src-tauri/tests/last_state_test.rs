@@ -164,3 +164,32 @@ fn test_saves_from_two_threads_both_land() {
     let _ = fs::remove_dir_all(&*dir);
     let _ = fs::remove_dir_all(data);
 }
+
+/// Kept cards are for showing. Only a live scan's cards can be acted on: the
+/// backend looks every action up in the last live scan, which the snapshot
+/// never fills.
+#[test]
+fn test_kept_cards_cannot_be_acted_on() {
+    use alpheus_lib::ScanState;
+    let dir = fixture("act");
+    last_state::save_cards(&dir, &[card("trash", 2048)], 1);
+    let kept = last_state::load(&dir).cards.unwrap();
+
+    let live = ScanState::default();
+    let err = live
+        .live(&kept[0].id)
+        .err()
+        .expect("a kept card is refused");
+    assert!(err.contains("rescan"), "says what to do: {err}");
+
+    live.0
+        .lock()
+        .unwrap()
+        .insert("trash".into(), card("trash", 2048));
+    assert_eq!(
+        live.live("trash").unwrap().id,
+        "trash",
+        "a live card is found"
+    );
+    let _ = fs::remove_dir_all(dir);
+}

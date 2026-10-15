@@ -19,6 +19,7 @@ import StorageDetail from "./components/StorageDetail";
 import { cardMatches, isEmptyQuery, parseQuery } from "./search";
 import { fmtBytes } from "./format";
 import { fmtKB } from "./format";
+import { snapshotNote } from "./storage/snapshot";
 
 function ScanningState() {
   return (
@@ -111,6 +112,9 @@ export default function App() {
   );
 
   const visibleTiers = TIER_ORDER.filter((t) => filter === "all" || filter === t);
+  // A rescan of live cards dims them; cards kept from the last scan stay
+  // readable (their actions are locked instead).
+  const rescanning = s.scanning && !s.cardsFromSnapshot;
 
   return (
     <div className="relative h-screen overflow-hidden" style={{ background: "var(--w1)" }}>
@@ -203,6 +207,27 @@ export default function App() {
               <HistoryPanel entries={s.history} />
             ) : (
               <div className="flex flex-col gap-4">
+                {s.cardsFromSnapshot && s.cardsAt !== null && (
+                  <div
+                    className="mono fade-up flex items-center gap-2 self-start rounded-[9px] px-3 py-1.5 text-[10.5px]"
+                    style={{
+                      color: "var(--txt2)",
+                      background: "var(--glass-a)",
+                      boxShadow: "inset 0 1px 0 var(--edge-hi), 0 0 0 1px var(--edge-lo)",
+                    }}
+                  >
+                    <svg className="spin-fast" width="10" height="10" viewBox="0 0 12 12" fill="none">
+                      <circle cx="6" cy="6" r="4.5" stroke="var(--track)" strokeWidth="1.6" />
+                      <path
+                        d="M6 1.5a4.5 4.5 0 0 1 4.5 4.5"
+                        stroke="var(--accent)"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    {snapshotNote(s.cardsAt, Date.now() / 1000)} · actions unlock when it finishes
+                  </div>
+                )}
                 {s.scanning && !s.cards ? (
                   <ScanningState />
                 ) : s.cards && s.cards.length === 0 ? (
@@ -215,7 +240,7 @@ export default function App() {
                     </div>
                   </div>
                 ) : s.usage && s.cards && filter === "all" && !searching ? (
-                  <div className={s.scanning ? "pointer-events-none opacity-60" : ""}>
+                  <div className={rescanning ? "pointer-events-none opacity-60" : ""}>
                     <OverviewPanel
                       usage={s.usage}
                       cards={s.cards}
@@ -235,12 +260,13 @@ export default function App() {
                     links={b.links}
                     onReclaim={s.openCard}
                     onFullDiskAccess={b.openFullDiskAccess}
+                    locked={s.cardsFromSnapshot}
                   />
                 )}
 
                 {s.cards && s.cards.length > 0 && (
                   <div
-                    className={`flex flex-col gap-4 ${s.scanning ? "pointer-events-none opacity-60" : ""}`}
+                    className={`flex flex-col gap-4 ${rescanning ? "pointer-events-none opacity-60" : ""}`}
                   >
                     {(s.cards ?? []).filter(
                       (c) =>
@@ -300,6 +326,7 @@ export default function App() {
                                   : null
                               }
                               onToggleAuto={toggleAuto}
+                              locked={s.cardsFromSnapshot}
                             />
                           ))}
                         </section>

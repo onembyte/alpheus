@@ -11,9 +11,19 @@ interface Props {
   /** null → card not eligible for automatic cleanup (chip hidden). */
   autoOn: boolean | null;
   onToggleAuto: (id: string) => void;
+  /** Shown from the last scan, kept on disk: readable, not actionable yet. */
+  locked?: boolean;
 }
 
-export default function CardRow({ card, color, maxKb, onAction, autoOn, onToggleAuto }: Props) {
+export default function CardRow({
+  card,
+  color,
+  maxKb,
+  onAction,
+  autoOn,
+  onToggleAuto,
+  locked = false,
+}: Props) {
   const [expanded, setExpanded] = useState(false);
   const actionable = card.action !== "explain";
   const pct = maxKb > 0 ? Math.max(2, (card.size_kb / maxKb) * 100) : 0;
@@ -94,8 +104,14 @@ export default function CardRow({ card, color, maxKb, onAction, autoOn, onToggle
           {actionable ? (
             <button
               onClick={() => onAction(card)}
+              disabled={locked}
+              title={locked ? "Unlocks when the new scan finishes" : undefined}
               className="glass-chip btn-focus h-7 rounded-lg px-3 text-[11.5px] font-semibold"
-              style={{ color: "var(--txt)" }}
+              style={{
+                color: "var(--txt)",
+                opacity: locked ? 0.45 : 1,
+                cursor: locked ? "default" : "pointer",
+              }}
             >
               {card.tier === "safe" ? "Reclaim" : "Review"}
             </button>

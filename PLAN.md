@@ -94,7 +94,7 @@ background. Proposed; waiting for Franco's go-ahead on the format.
 - [x] S2 While refreshing, each row keeps its snapshot value until the live walk
       has measured it, then corrects in place; unmeasured space never shows as
       System Data
-- [ ] S3 Snapshot cards show at once but act only after the fresh scan (the
+- [x] S3 Snapshot cards show at once but act only after the fresh scan (the
       backend already refuses ids the last live scan didn't produce)
 - [ ] **Gate S**: launch after a reboot-like cold start, screenshots
 
