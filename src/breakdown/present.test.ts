@@ -29,6 +29,8 @@ const base: Screen = {
   preview: false,
   asOf: null,
   loading: false,
+  filesHere: null,
+  measuringHere: false,
   files: 0,
   unreadable: 0,
 };
@@ -48,6 +50,12 @@ describe("statusLine", () => {
 
   it("dates a finished walk", () => {
     expect(statusLine({ ...base, asOf: 1760000000 })).toBe(`Measured ${fmtDate(1760000000)}`);
+  });
+
+  it("says which folder is being looked into after the walk ended", () => {
+    expect(
+      statusLine({ ...base, title: "Autodesk", measuringHere: true, asOf: 1760000000 }),
+    ).toBe("Looking inside Autodesk");
   });
 
   it("is honest before anything is known", () => {

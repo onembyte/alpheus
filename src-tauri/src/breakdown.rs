@@ -16,7 +16,7 @@ use crate::qos;
 use crate::tree::{NodeId, State, Tree, View};
 use crate::walker::{self, Shared};
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
@@ -84,13 +84,54 @@ pub struct Payload {
     pub finished: Option<u64>,
 }
 
-pub struct Session {
+/// Levels kept below a folder whose insides are measured on demand.
+const DEEPEN_LEVELS: usize = 3;
+
+type Emit = dyn Fn(Payload) + Send + Sync;
+
+/// What every thread of a session shares.
+struct Core {
     tree: Arc<Tree>,
     shared: Arc<Shared>,
-    focus: Arc<Mutex<Option<NodeId>>>,
-    finished: Arc<Mutex<Option<u64>>>,
+    /// Folder each job node was walked from, to find a node's path on disk.
+    paths: HashMap<NodeId, PathBuf>,
+    focus: Mutex<Option<NodeId>>,
+    finished: Mutex<Option<u64>>,
     started: u64,
-    handle: Mutex<Option<JoinHandle<()>>>,
+    every: Duration,
+    emit: Box<Emit>,
+}
+
+impl Core {
+    fn payload(&self) -> Payload {
+        let finished = *self.finished.lock().unwrap();
+        Payload {
+            root: self.tree.snapshot(Tree::ROOT, 1, 50),
+            focus: self
+                .focus
+                .lock()
+                .unwrap()
+                .map(|id| self.tree.snapshot(id, 1, 200)),
+            files: self.shared.files.load(Relaxed),
+            unreadable: self.shared.unreadable.load(Relaxed),
+            running: finished.is_none(),
+            started: self.started,
+            finished,
+        }
+    }
+
+    fn emit(&self) {
+        (self.emit)(self.payload());
+    }
+}
+
+pub struct Session {
+    core: Arc<Core>,
+    /// The main walk, then one thread per folder opened past the kept depth.
+    threads: Mutex<Vec<JoinHandle<()>>>,
+    /// Each on-demand walk's own state: a fresh hard-link set, so files the
+    /// main walk already counted aren't read as zero inside the folder.
+    deepens: Mutex<Vec<Arc<Shared>>>,
 }
 
 impl Session {
@@ -105,7 +146,7 @@ impl Session {
         emit: F,
     ) -> Session
     where
-        F: Fn(Payload) + Send + 'static,
+        F: Fn(Payload) + Send + Sync + 'static,
     {
         let name = container
             .as_ref()
@@ -113,95 +154,113 @@ impl Session {
             .map_or("Disk".to_string(), |v| v.name.clone());
         let tree = Arc::new(Tree::new(&name));
         let jobs = categories::build(&tree, container.as_ref(), categories::plan(&data, &home));
-        let s = Session {
+        let core = Arc::new(Core {
             tree,
             shared: Arc::new(Shared::default()),
-            focus: Arc::default(),
-            finished: Arc::default(),
+            paths: jobs.iter().map(|(p, id)| (*id, p.clone())).collect(),
+            focus: Mutex::new(None),
+            finished: Mutex::new(None),
             started: now(),
-            handle: Mutex::new(None),
-        };
-        let (tree, shared, focus, finished, started) = (
-            s.tree.clone(),
-            s.shared.clone(),
-            s.focus.clone(),
-            s.finished.clone(),
-            s.started,
-        );
-        let handle = std::thread::spawn(move || {
-            qos::lower();
-            let live = |t: &Tree| emit(payload(t, &shared, *focus.lock().unwrap(), started, None));
-            run(jobs, tree.clone(), shared.clone(), WORKERS, every, live);
-            let end = Some(now());
-            *finished.lock().unwrap() = end;
-            emit(payload(
-                &tree,
-                &shared,
-                *focus.lock().unwrap(),
-                started,
-                end,
-            ));
+            every,
+            emit: Box::new(emit),
         });
-        *s.handle.lock().unwrap() = Some(handle);
-        s
+        let c = core.clone();
+        let main = std::thread::spawn(move || {
+            qos::lower();
+            run(
+                jobs,
+                c.tree.clone(),
+                c.shared.clone(),
+                WORKERS,
+                every,
+                |_| c.emit(),
+            );
+            *c.finished.lock().unwrap() = Some(now());
+            c.emit();
+        });
+        Session {
+            core,
+            threads: Mutex::new(vec![main]),
+            deepens: Mutex::new(vec![]),
+        }
     }
 
     pub fn cancel(&self) {
-        self.shared.cancel.store(true, Relaxed);
+        self.core.shared.cancel.store(true, Relaxed);
+        for d in self.deepens.lock().unwrap().iter() {
+            d.cancel.store(true, Relaxed);
+        }
     }
 
+    /// Whether the main walk is still running.
     pub fn running(&self) -> bool {
-        self.finished.lock().unwrap().is_none()
+        self.core.finished.lock().unwrap().is_none()
     }
 
-    /// Blocks until the walk has ended (finished or cancelled).
+    /// Blocks until every walk of this session has ended.
     pub fn wait(&self) {
-        if let Some(h) = self.handle.lock().unwrap().take() {
+        loop {
+            let Some(h) = self.threads.lock().unwrap().pop() else {
+                break;
+            };
             let _ = h.join();
         }
     }
 
     /// The row whose children travel with each payload; an id the tree
-    /// doesn't have clears it.
+    /// doesn't have clears it. Opening a row past the kept depth measures
+    /// its insides in the background.
     pub fn set_focus(&self, id: Option<NodeId>) {
-        *self.focus.lock().unwrap() = id.filter(|i| self.tree.has(*i));
+        let id = id.filter(|i| self.core.tree.has(*i));
+        *self.core.focus.lock().unwrap() = id;
+        if let Some(id) = id {
+            self.deepen(id);
+        }
+    }
+
+    fn deepen(&self, id: NodeId) {
+        let Some(path) = self.core.tree.path_from(id, &self.core.paths) else {
+            return;
+        };
+        if !path.is_dir() || self.core.shared.cancel.load(Relaxed) {
+            return;
+        }
+        let Some(staging) = self.core.tree.try_stage(id, DEEPEN_LEVELS) else {
+            return;
+        };
+        let shared = Arc::new(Shared::default());
+        self.deepens.lock().unwrap().push(shared.clone());
+        let c = self.core.clone();
+        let h = std::thread::spawn(move || {
+            qos::lower();
+            let every = c.every;
+            run(
+                vec![(path, staging)],
+                c.tree.clone(),
+                shared.clone(),
+                1,
+                every,
+                |_| c.emit(),
+            );
+            if !shared.cancel.load(Relaxed) {
+                c.tree.swap(id);
+            }
+            c.emit();
+        });
+        self.threads.lock().unwrap().push(h);
     }
 
     pub fn payload(&self) -> Payload {
-        payload(
-            &self.tree,
-            &self.shared,
-            *self.focus.lock().unwrap(),
-            self.started,
-            *self.finished.lock().unwrap(),
-        )
+        self.core.payload()
     }
 
     /// The result as cached for the next launch: two levels, so the preview
     /// can open a category before the new walk reaches it.
     pub fn cached(&self) -> Payload {
         let mut p = self.payload();
-        p.root = self.tree.snapshot(Tree::ROOT, 2, 50);
+        p.root = self.core.tree.snapshot(Tree::ROOT, 2, 50);
         p.focus = None;
         p
-    }
-}
-
-fn payload(
-    tree: &Tree,
-    shared: &Shared,
-    focus: Option<NodeId>,
-    started: u64,
-    finished: Option<u64>,
-) -> Payload {
-    Payload {
-        root: tree.snapshot(Tree::ROOT, 1, 50),
-        focus: focus.map(|id| tree.snapshot(id, 1, 200)),
-        files: shared.files.load(Relaxed),
-        unreadable: shared.unreadable.load(Relaxed),
-        running: finished.is_none(),
-        started,
-        finished,
     }
 }
 

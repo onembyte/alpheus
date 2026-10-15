@@ -1,9 +1,13 @@
-import type { Row, Screen } from "../breakdown/state";
+import type { Crumb, Row, Screen } from "../breakdown/state";
 import { categoryColor, statusLine } from "../breakdown/present";
 import { fmtBytes } from "../format";
 
 interface Props {
   screen: Screen;
+  /** Opens a row; the walk keeps running meanwhile. */
+  onOpen: (crumb: Crumb) => void;
+  /** Back to the breadcrumb at `to`; -1 is the top. */
+  onUp: (to: number) => void;
 }
 
 function Spinner() {
@@ -20,27 +24,90 @@ function Spinner() {
   );
 }
 
+function Chevron({ left = false }: { left?: boolean }) {
+  return (
+    <svg
+      width="10"
+      height="10"
+      viewBox="0 0 12 12"
+      fill="none"
+      style={{ transform: left ? "rotate(180deg)" : "none" }}
+    >
+      <path
+        d="M4.4 2.4 8 6l-3.6 3.6"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /**
  * What the disk holds, by the categories System Settings → Storage uses,
- * measured live by the backend. Read-only: removing things is the cards' job.
+ * measured live by the backend. Rows open while the walk runs. Read-only:
+ * removing things is the cards' job.
  */
-export default function StorageDetail({ screen: s }: Props) {
-  const max = Math.max(1, ...s.rows.map((r) => Math.max(r.bytes, r.previous ?? 0)));
+export default function StorageDetail({ screen: s, onOpen, onUp }: Props) {
+  const top = s.crumbs.length === 0;
+  // Inside a category every row wears the category's color.
+  const colorOf = (r: Row) => categoryColor(top ? r.name : s.crumbs[0].name);
+  const max = Math.max(
+    1,
+    s.filesHere ?? 0,
+    ...s.rows.map((r) => Math.max(r.bytes, r.previous ?? 0)),
+  );
 
   return (
     <section className="glass-card fade-up px-[18px] pb-1.5 pt-4">
-      <div className="mb-3 flex items-baseline gap-2.5">
-        <h2 className="section-label flex-none">Storage detail</h2>
+      <div className="mb-3 flex min-w-0 items-center gap-2.5">
+        {!top && (
+          <button
+            onClick={() => onUp(s.crumbs.length - 2)}
+            aria-label="Back"
+            className="glass-chip btn-focus flex h-6 w-6 flex-none items-center justify-center rounded-md"
+            style={{ color: "var(--txt2)" }}
+          >
+            <Chevron left />
+          </button>
+        )}
+        <nav className="flex min-w-0 items-baseline gap-1.5" aria-label="Breadcrumb">
+          <button
+            onClick={() => onUp(-1)}
+            disabled={top}
+            className="section-label btn-focus flex-none"
+            style={{ cursor: top ? "default" : "pointer" }}
+          >
+            Storage detail
+          </button>
+          {s.crumbs.map((c, i) => (
+            <span key={c.id} className="flex min-w-0 items-baseline gap-1.5">
+              <span className="text-[11px]" style={{ color: "var(--txt3)" }}>
+                ›
+              </span>
+              <button
+                onClick={() => onUp(i)}
+                disabled={i === s.crumbs.length - 1}
+                className="btn-focus truncate text-[12px] font-semibold"
+                style={{ color: i === s.crumbs.length - 1 ? "var(--txt)" : "var(--txt2)" }}
+              >
+                {c.name}
+              </button>
+            </span>
+          ))}
+        </nav>
         {s.total > 0 && (
           <span className="mono flex-none text-[10.5px]" style={{ color: "var(--txt2)" }}>
-            {fmtBytes(s.total)} used
+            {fmtBytes(s.total)}
+            {top ? " used" : ""}
           </span>
         )}
         <span
-          className="mono ml-auto flex min-w-0 items-center gap-1.5 self-center text-[10px]"
+          className="mono ml-auto flex min-w-0 items-center gap-1.5 text-[10px]"
           style={{ color: "var(--txt3)" }}
         >
-          {s.running && <Spinner />}
+          {(s.running || s.measuringHere) && <Spinner />}
           <span className="truncate">{statusLine(s)}</span>
         </span>
       </div>
@@ -51,14 +118,16 @@ export default function StorageDetail({ screen: s }: Props) {
           style={{ background: "var(--track)", boxShadow: "inset 0 1px 3px rgba(0,0,0,.22)" }}
         >
           {s.rows.map(
-            (r) =>
+            (r, i) =>
               r.bytes > 0 && (
                 <div
                   key={r.id}
                   title={`${r.name} — ${fmtBytes(r.bytes)}`}
                   style={{
                     width: `${r.share * 100}%`,
-                    background: categoryColor(r.name),
+                    background: colorOf(r),
+                    // Inside a category, fade down the list so neighbours part.
+                    opacity: top ? 1 : Math.max(0.35, 1 - i * 0.12),
                     transition: "width .5s ease",
                   }}
                 />
@@ -76,11 +145,43 @@ export default function StorageDetail({ screen: s }: Props) {
 
       <div className="mt-1.5">
         {s.rows.map((r) => (
-          <DetailRow key={r.id} row={r} max={max} />
+          <DetailRow key={r.id} row={r} max={max} color={colorOf(r)} onOpen={onOpen} />
         ))}
-        {s.rows.length === 0 && (
+        {s.filesHere !== null && (
+          <div className="hairline-b flex items-center gap-3.5 py-2 last:border-0">
+            <div
+              className="h-[22px] w-2 flex-none rounded-[3px]"
+              style={{ background: "var(--track)" }}
+            />
+            <div className="w-[190px] flex-none truncate text-[12.5px]" style={{ color: "var(--txt2)" }}>
+              Files directly in {s.title}
+            </div>
+            <div
+              className="h-[9px] min-w-0 flex-1 overflow-hidden rounded-[5px]"
+              style={{ background: "var(--track)" }}
+            >
+              <div
+                className="h-full rounded-[5px]"
+                style={{ width: `${(s.filesHere / max) * 100}%`, background: "var(--c7)" }}
+              />
+            </div>
+            <div
+              className="mono w-[86px] flex-none text-right text-[12px] font-semibold"
+              style={{ color: "var(--txt2)" }}
+            >
+              {fmtBytes(s.filesHere)}
+            </div>
+            <div className="w-6 flex-none" />
+          </div>
+        )}
+        {s.other && (
+          <div className="mono py-2 text-[10.5px]" style={{ color: "var(--txt3)" }}>
+            + {s.other.count.toLocaleString()} smaller · {fmtBytes(s.other.bytes)}
+          </div>
+        )}
+        {s.rows.length === 0 && s.filesHere === null && (
           <div className="py-6 text-center text-[12px]" style={{ color: "var(--txt3)" }}>
-            {s.loading ? "Opening…" : "Measuring starts in a moment."}
+            {s.loading || s.measuringHere ? "Looking inside…" : "Measuring starts in a moment."}
           </div>
         )}
       </div>
@@ -88,13 +189,22 @@ export default function StorageDetail({ screen: s }: Props) {
   );
 }
 
-function DetailRow({ row: r, max }: { row: Row; max: number }) {
-  const color = categoryColor(r.name);
+function DetailRow({
+  row: r,
+  max,
+  color,
+  onOpen,
+}: {
+  row: Row;
+  max: number;
+  color: string;
+  onOpen: (crumb: Crumb) => void;
+}) {
   const measuring = r.state !== "done";
-  return (
-    <div className="hairline-b flex items-center gap-3.5 py-2 last:border-0">
+  const body = (
+    <>
       <div className="h-[22px] w-2 flex-none rounded-[3px]" style={{ background: color }} />
-      <div className="w-[190px] flex-none">
+      <div className="w-[190px] flex-none text-left">
         <div className="truncate text-[12.5px] font-medium" style={{ color: "var(--txt)" }}>
           {r.name}
         </div>
@@ -103,7 +213,7 @@ function DetailRow({ row: r, max }: { row: Row; max: number }) {
             ? r.previous !== null
               ? `measuring · ${fmtBytes(r.previous)} last time`
               : "measuring"
-            : `${(r.share * 100).toFixed(r.share < 0.1 ? 1 : 0)}% of used`}
+            : `${(r.share * 100).toFixed(r.share < 0.1 ? 1 : 0)}%`}
         </div>
       </div>
       <div
@@ -139,6 +249,21 @@ function DetailRow({ row: r, max }: { row: Row; max: number }) {
           {r.bytes > 0 ? fmtBytes(r.bytes) : "—"}
         </span>
       </div>
-    </div>
+      <div className="flex w-6 flex-none justify-center" style={{ color: "var(--txt3)" }}>
+        {r.openable && <Chevron />}
+      </div>
+    </>
+  );
+
+  return r.openable ? (
+    <button
+      onClick={() => onOpen({ id: r.id, name: r.name })}
+      className="hairline-b btn-focus -mx-2 flex w-[calc(100%+1rem)] items-center gap-3.5 rounded-lg px-2 py-2 transition-colors last:border-0 hover:bg-(--track)"
+      title={`Open ${r.name}`}
+    >
+      {body}
+    </button>
+  ) : (
+    <div className="hairline-b flex items-center gap-3.5 py-2 last:border-0">{body}</div>
   );
 }

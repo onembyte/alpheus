@@ -27,6 +27,7 @@ export function categoryColor(name: string): string {
 /** One line on where the numbers come from and how fresh they are. */
 export function statusLine(s: Screen): string {
   if (s.running) return `Measuring · ${s.files.toLocaleString()} files`;
+  if (s.measuringHere) return `Looking inside ${s.title}`;
   if (s.preview && s.asOf) return `As of ${fmtDate(s.asOf)} · updating`;
   if (s.asOf) return `Measured ${fmtDate(s.asOf)}`;
   return "Not measured yet";

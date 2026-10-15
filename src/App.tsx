@@ -227,7 +227,9 @@ export default function App() {
 
                 {/* Live and usable at all times: outside the wrapper a rescan dims,
                     and shown even while the first reclaim scan runs. */}
-                {filter === "all" && !searching && <StorageDetail screen={b.screen} />}
+                {filter === "all" && !searching && (
+                  <StorageDetail screen={b.screen} onOpen={b.open} onUp={b.up} />
+                )}
 
                 {s.cards && s.cards.length > 0 && (
                   <div

@@ -66,7 +66,7 @@ One item per step, test first. Stop and ask at each gate.
 ### Phase B: UI
 - [x] B1 `useBreakdown` hook: events into state, never blocks other views
 - [x] B2 Storage detail section: category rows, live sizes, measuring state
-- [ ] B3 Drill-down with breadcrumb while the walk continues. The tree keeps
+- [x] B3 Drill-down with breadcrumb while the walk continues. The tree keeps
       3 levels below each walked folder (keeping every folder would hold
       hundreds of thousands of rows in memory); drilling past that walks
       just that folder again, into a staging subtree swapped in when done,

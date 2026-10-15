@@ -188,3 +188,87 @@ fn test_cancel_leaves_unstarted_jobs_pending() {
     );
     let _ = fs::remove_dir_all(root);
 }
+
+// ---------------------------------------------------------------- drill-down
+
+/// A row opens when it has rows below it, or when folders were folded into
+/// it at the kept depth (opening measures them). A folder of only files, a
+/// category or an APFS volume has nothing more to open.
+#[test]
+fn test_view_says_which_rows_open() {
+    let root = sample("openable");
+    let tree = Tree::new("Disk");
+    let cat = tree.add(Tree::ROOT, "Apps", 0);
+    let job = tree.add(cat, "apps", 1);
+    tree.add_measured(cat, "Preboot", 4096);
+    walker::walk(&root.join("apps"), job, &tree, &Shared::default());
+    tree.set_state(job, State::Done);
+
+    let v = tree.snapshot(cat, 2, 50);
+    let apps = find(&v, "apps");
+    assert!(apps.openable);
+    assert_eq!(apps.child_count, 8);
+    assert!(
+        !find(&v, "Preboot").openable,
+        "an APFS volume has no insides here"
+    );
+    let b = find(apps, "b");
+    assert!(b.openable, "x was folded into b at the kept depth");
+    assert_eq!(b.child_count, 0);
+    assert!(!find(apps, "a").openable, "a holds only a file");
+    assert!(tree.deepen_target(b.id));
+    assert!(!tree.deepen_target(apps.id), "already has rows below it");
+    assert!(!tree.deepen_target(find(apps, "a").id));
+    let _ = fs::remove_dir_all(root);
+}
+
+/// Measuring a row's insides goes into a staging node no total counts, so
+/// the numbers above never jump; its rows show live, and the swap at the end
+/// leaves the totals as they were.
+#[test]
+fn test_deepening_swaps_in_without_moving_totals() {
+    let root = sample("deepen");
+    let tree = Tree::new("Disk");
+    let job = tree.add(Tree::ROOT, "apps", 1);
+    walker::walk(&root.join("apps"), job, &tree, &Shared::default());
+    tree.set_state(job, State::Done);
+    let b = find(&tree.snapshot(job, 1, 50), "b").id;
+    let (before_job, before_b) = (tree.snapshot(job, 0, 0).bytes, tree.snapshot(b, 0, 0).bytes);
+
+    let staging = tree.stage(b, 3);
+    walker::walk(&root.join("apps/b"), staging, &tree, &Shared::default());
+    assert_eq!(
+        tree.snapshot(job, 0, 0).bytes,
+        before_job,
+        "staging is not counted"
+    );
+    let live = tree.snapshot(b, 1, 50);
+    assert!(live.state == State::Measuring);
+    assert!(
+        live.children.iter().any(|c| c.name == "x"),
+        "rows show while measuring"
+    );
+
+    tree.swap(b);
+    let after = tree.snapshot(b, 1, 50);
+    assert!(after.state == State::Done);
+    assert_eq!(after.bytes, before_b);
+    assert_eq!(tree.snapshot(job, 0, 0).bytes, before_job);
+    assert!(after.children.iter().any(|c| c.name == "x"));
+    assert!(!tree.deepen_target(b), "nothing left to deepen");
+    let _ = fs::remove_dir_all(root);
+}
+
+/// A node's folder on disk: its job's path plus the names below it.
+#[test]
+fn test_path_from_the_nearest_job() {
+    let root = sample("path");
+    let tree = Tree::new("Disk");
+    let job = tree.add(Tree::ROOT, "Applications", 2);
+    walker::walk(&root.join("apps"), job, &tree, &Shared::default());
+    let x = find(find(&tree.snapshot(job, 2, 50), "b"), "x").id;
+    let jobs = std::collections::HashMap::from([(job, root.join("apps"))]);
+    assert_eq!(tree.path_from(x, &jobs), Some(root.join("apps/b/x")));
+    assert_eq!(tree.path_from(Tree::ROOT, &jobs), None, "above every job");
+    let _ = fs::remove_dir_all(root);
+}

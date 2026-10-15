@@ -18,6 +18,8 @@ function node(
     children,
     other_count: 0,
     other_bytes: 0,
+    child_count: children.length,
+    openable: children.length > 0,
     ...extra,
   };
 }
@@ -151,5 +153,51 @@ describe("drilling in", () => {
       { type: "payload", payload: next },
     );
     expect(screen(s).crumbs).toEqual([{ id: newDev.id, name: "Developer" }]);
+  });
+});
+
+describe("opening rows", () => {
+  it("says which rows open, and keeps files sitting directly in the opened folder", () => {
+    const dev = node("Developer", 200);
+    const live = payload(node("Mac", 300, [dev]));
+    const focus = node(
+      "Developer",
+      200,
+      [node("dev", 150, [node("x", 150)]), node("notes", 10, [], { openable: false })],
+      { id: dev.id, own_bytes: 40 },
+    );
+    const s = screen(
+      run(
+        { type: "payload", payload: live },
+        { type: "open", crumb: { id: dev.id, name: "Developer" } },
+        { type: "payload", payload: { ...live, focus } },
+      ),
+    );
+    expect(s.rows.map((r) => [r.name, r.openable])).toEqual([
+      ["dev", true],
+      ["notes", false],
+    ]);
+    expect(s.filesHere).toBe(40);
+  });
+
+  it("knows when the opened folder is still being looked into", () => {
+    const dev = node("Developer", 200);
+    const live = payload(node("Mac", 300, [dev]), { running: false, finished: 120 });
+    const focus = node("Developer", 200, [node("dev", 20)], { id: dev.id, state: "measuring" });
+    const s = screen(
+      run(
+        { type: "payload", payload: live },
+        { type: "open", crumb: { id: dev.id, name: "Developer" } },
+        { type: "payload", payload: { ...live, focus } },
+      ),
+    );
+    expect(s.running).toBe(false);
+    expect(s.measuringHere).toBe(true);
+  });
+
+  it("has no files row at the top, where categories add up to the disk", () => {
+    const s = screen(run({ type: "payload", payload: payload(node("Mac", 10, [node("A", 10)])) }));
+    expect(s.filesHere).toBeNull();
+    expect(s.measuringHere).toBe(false);
   });
 });

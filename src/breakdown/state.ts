@@ -69,6 +69,8 @@ export interface Row {
   state: NodeState;
   /** Fraction of the parent, 0 to 1. */
   share: number;
+  /** Clicking it shows what is inside. */
+  openable: boolean;
 }
 
 export interface Screen {
@@ -84,6 +86,10 @@ export interface Screen {
   asOf: number | null;
   /** A row was opened and its children haven't arrived yet. */
   loading: boolean;
+  /** Bytes sitting directly in the opened folder, beside its subfolders. */
+  filesHere: number | null;
+  /** The opened row is itself still being measured (its insides, on demand). */
+  measuringHere: boolean;
   files: number;
   unreadable: number;
 }
@@ -99,7 +105,7 @@ export function screen(s: State): Screen {
     files: source?.files ?? 0,
     unreadable: source?.unreadable ?? 0,
   };
-  const empty = { total: 0, rows: [], other: null };
+  const empty = { total: 0, rows: [], other: null, filesHere: null, measuringHere: false };
   if (!source) return { ...base, ...empty, title: null, loading: false };
 
   const parent = s.path.length === 0 ? source.root : s.focus;
@@ -118,9 +124,13 @@ export function screen(s: State): Screen {
       previous: before?.get(c.name) ?? null,
       state: c.state,
       share: parent.bytes > 0 ? c.bytes / parent.bytes : 0,
+      openable: c.openable,
     })),
     other: parent.other_count > 0 ? { count: parent.other_count, bytes: parent.other_bytes } : null,
     loading: false,
+    // At the top the categories add up to the disk; files only sit in folders.
+    filesHere: s.path.length > 0 && parent.own_bytes > 0 ? parent.own_bytes : null,
+    measuringHere: s.path.length > 0 && parent.state !== "done",
   };
 }
 

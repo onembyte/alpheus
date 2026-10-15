@@ -71,6 +71,10 @@ export interface BreakdownNode {
   children: BreakdownNode[];
   other_count: number;
   other_bytes: number;
+  /** All of its children, shown or not. */
+  child_count: number;
+  /** Opening it shows rows (children, or folded folders measured on demand). */
+  openable: boolean;
 }
 
 /** What each `breakdown` event carries (Rust `breakdown::Payload`). */

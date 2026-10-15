@@ -253,3 +253,42 @@ fn test_slot_keeps_one_walk_at_a_time() {
     next.wait();
     let _ = fs::remove_dir_all(d);
 }
+
+/// Opening a row past the kept depth measures its insides in the background,
+/// and the rows arrive in later payloads.
+#[test]
+fn test_opening_past_the_kept_depth_measures_it() {
+    let d = data_volume("deepen");
+    mk(&d, "Users/me/Documents/a/b/c/d/deep.bin", 64);
+    let s = start(&d, Arc::default());
+    s.wait();
+
+    let child = |p: &Payload, name: &str| {
+        let parent = p.focus.as_ref().unwrap_or(&p.root);
+        parent
+            .children
+            .iter()
+            .find(|c| c.name == name)
+            .unwrap_or_else(|| panic!("no {name} under {}", parent.name))
+            .clone()
+    };
+    // Documents (category) → Documents (folder) → a → b → c, kept 3 deep.
+    let mut p = s.payload();
+    for name in ["Documents", "Documents", "a", "b"] {
+        s.set_focus(Some(child(&p, name).id));
+        p = s.payload();
+    }
+    let c = child(&p, "c");
+    assert!(c.openable && c.child_count == 0, "d was folded into c");
+
+    s.set_focus(Some(c.id));
+    s.wait();
+    let opened = s.payload().focus.expect("focus on c");
+    assert!(opened.state == alpheus_lib::tree::State::Done);
+    assert!(
+        opened.children.iter().any(|x| x.name == "d"),
+        "c's insides were measured"
+    );
+    assert_eq!(opened.bytes, c.bytes, "the total didn't move");
+    let _ = fs::remove_dir_all(d);
+}
