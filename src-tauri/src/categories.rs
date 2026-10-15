@@ -15,6 +15,7 @@ use crate::tree::{NodeId, Tree};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
 #[derive(Serialize, Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -98,14 +99,20 @@ pub struct Job {
 
 /// Every job for the Data volume mounted at `data`, for the user whose home
 /// is `home` (an absolute path as the system sees it, e.g. `/Users/me`).
+/// Top-level entries on another device (mounts, Linux's /proc) are skipped.
 pub fn plan(data: &Path, home: &Path) -> Vec<Job> {
     let home = data.join(home.strip_prefix("/").unwrap_or(home));
+    let device = fs::symlink_metadata(data).map(|m| m.dev()).ok();
     let mut jobs = vec![];
     for (name, path) in entries(data) {
+        let elsewhere = fs::symlink_metadata(&path).is_ok_and(|m| Some(m.dev()) != device);
+        if elsewhere {
+            continue;
+        }
         match name.as_str() {
             "Volumes" => {}
             "Applications" => apps(&path, &mut jobs),
-            "Users" => {
+            "Users" | "home" => {
                 for (user, p) in entries(&path) {
                     if p == home {
                         home_jobs(&p, &mut jobs);

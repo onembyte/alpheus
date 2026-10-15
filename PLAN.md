@@ -54,7 +54,7 @@ One item per step, test first. Stop and ask at each gate.
 - [x] A3 Progressive tree: breadth-first scheduler, throttled snapshots;
       totals only grow; final total matches `du` within 1%
 - [x] A4 Category map, as in System Settings → Storage (design item 2)
-- [ ] A5 Background QoS, Tauri commands and events (start, cancel, cached),
+- [x] A5 Background QoS (utility class, see Gate A), Tauri commands and events (start, cancel, cached),
       cache file
 - [ ] **Gate A**: time the reclaim scan with and without a walk running; idle CPU
 

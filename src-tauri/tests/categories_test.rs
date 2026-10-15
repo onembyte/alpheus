@@ -299,3 +299,71 @@ fn real_disk_breakdown() {
         );
     }
 }
+
+/// Linux keeps homes in /home, not /Users.
+#[test]
+fn test_linux_home_is_split_like_users() {
+    let d = fixture("linux");
+    for rel in [
+        "home/me/Documents/a.txt",
+        "home/me/.cargo/x",
+        "home/other/x",
+    ] {
+        mk(&d, rel);
+    }
+    let jobs = categories::plan(&d, Path::new("/home/me"));
+    assert_eq!(
+        category_of(&jobs, &d, "home/me/Documents"),
+        Category::Documents
+    );
+    assert_eq!(
+        category_of(&jobs, &d, "home/me/.cargo"),
+        Category::Developer
+    );
+    assert_eq!(category_of(&jobs, &d, "home/other"), Category::OtherUsers);
+    let _ = fs::remove_dir_all(d);
+}
+
+/// A top-level entry on another device (a mount, Linux's /proc) is never a
+/// job: the walker stays on the volume it starts on, so a job rooted there
+/// would walk the other disk.
+#[cfg(target_os = "macos")]
+#[test]
+fn test_top_level_mounts_are_skipped() {
+    use std::process::Command;
+    let d = fixture("mount");
+    mk(&d, "Library/x");
+    let image = d.with_extension("dmg");
+    let mnt = d.join("mnt");
+    fs::create_dir_all(&mnt).unwrap();
+    let made = Command::new("hdiutil")
+        .args([
+            "create", "-size", "4m", "-fs", "HFS+", "-volname", "t", "-quiet",
+        ])
+        .arg(&image)
+        .status()
+        .is_ok_and(|s| s.success())
+        && Command::new("hdiutil")
+            .args(["attach", "-nobrowse", "-quiet", "-mountpoint"])
+            .arg(&mnt)
+            .arg(&image)
+            .status()
+            .is_ok_and(|s| s.success());
+    if !made {
+        eprintln!("hdiutil unavailable; skipping");
+        let _ = fs::remove_dir_all(&d);
+        return;
+    }
+    let jobs = categories::plan(&d, Path::new("/Users/me"));
+    let _ = Command::new("hdiutil")
+        .args(["detach", "-quiet"])
+        .arg(&mnt)
+        .status();
+    let _ = fs::remove_file(&image);
+    let _ = fs::remove_dir_all(&d);
+    assert!(jobs.iter().any(|j| j.path == d.join("Library")));
+    assert!(
+        !jobs.iter().any(|j| j.path == mnt),
+        "mounted volume became a job"
+    );
+}

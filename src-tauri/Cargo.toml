@@ -23,6 +23,10 @@ chrono = "0.4"
 crossterm = "0.28"
 sha2 = "0.10"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# Thread QoS for the storage detail walk; already in the tree through Tauri.
+libc = "0.2"
+
 # Order and naming here are both load-bearing for `tauri build --target
 # universal-apple-darwin`: it runs `lipo` on the binary named after the
 # *package*, but bundles the *last* [[bin]] entry. The GUI has to be both, or

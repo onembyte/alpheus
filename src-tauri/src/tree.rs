@@ -7,13 +7,13 @@
 //! Sizes only ever grow, so successive snapshots never show a total shrink.
 
 use crate::walker::Sink;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::sync::Mutex;
 
 pub type NodeId = usize;
 
-#[derive(Serialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub enum State {
     Pending,
@@ -34,7 +34,7 @@ struct Node {
 }
 
 /// One node as the view sees it, with its biggest children.
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct View {
     pub id: NodeId,
     pub name: String,
@@ -109,6 +109,11 @@ impl Tree {
         self.nodes.lock().unwrap()[id].state = State::Done;
         *self.budget.lock().unwrap() = Some((id, budget));
         id
+    }
+
+    /// Whether `id` names a node. Ids arrive from the view, so check first.
+    pub fn has(&self, id: NodeId) -> bool {
+        id < self.nodes.lock().unwrap().len()
     }
 
     pub fn set_state(&self, id: NodeId, state: State) {
